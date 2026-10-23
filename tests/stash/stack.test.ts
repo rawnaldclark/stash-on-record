@@ -26,7 +26,7 @@ describe('stacking the sources', () => {
     expect(stack(archive, live, { spotify: true, stash: false, lastfm: true }).map((p) => p.title)).toEqual(['Spot', 'Scrob'])
   })
 
-  it('shows the phone's exported plays as Stash', () => {
+  it('shows the phone’s exported plays as Stash', () => {
     const phone = row('Phone', T - 3_600_000, 256)
     expect(stack([phone, ...archive], live, { spotify: false, stash: true, lastfm: false }).map((p) => [p.title, p.platform])).toEqual([
       ['Phone', 'Stash'],
