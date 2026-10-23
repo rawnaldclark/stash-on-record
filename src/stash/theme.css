@@ -330,3 +330,20 @@ body::after {
   min-width: 40px;
   height: 40px;
 }
+
+/* ---------- Inside the player's page ---------- */
+
+/*
+ * The player's header above the frame already says "Your Spotify years" and holds Bring a newer copy (its page menu), so on the
+ * long page the record's own brand and that button would say it twice. The phone deck keeps its bar as it is: there the brand is
+ * the dot that deals the first card, and New data lives in the tracklist menu.
+ */
+.dash:not(.is-cards) .topbar .brand,
+.dash:not(.is-cards) .topbar__actions .button--ghost {
+  display: none;
+}
+
+/* The launcher's shortcut chip stays on one line in a narrower frame */
+.topbar__launch kbd {
+  white-space: nowrap;
+}

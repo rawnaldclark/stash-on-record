@@ -11,7 +11,11 @@ import EmbedApp from './stash/EmbedApp'
 import { EMBEDDED } from './stash/embed'
 import { keepNoHistory } from './stash/history'
 
-if (EMBEDDED) keepNoHistory()
+if (EMBEDDED) {
+  keepNoHistory()
+  // A file dropped on the record would open in the frame in its place: the player's import sheet is where files go
+  for (const t of ['dragover', 'drop'] as const) window.addEventListener(t, (e) => e.preventDefault())
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

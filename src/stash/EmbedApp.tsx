@@ -28,11 +28,14 @@ export default function EmbedApp() {
       tellStash({ type: 'stash:ready', plays: result.plays.length })
     } catch {
       setState({ status: 'error' })
+      // the player's cover goes now, not after its wait: this page says what went wrong
+      tellStash({ type: 'stash:ready', plays: 0 })
     }
   }, [])
 
   useEffect(() => {
-    void load()
+    // The read is the external system here: its answer arrives after the effect, never inside it
+    void Promise.resolve().then(load)
     return onStash((m) => {
       if (m.type === 'stash:reload') void load()
       else if (m.type === 'stash:theme') document.documentElement.dataset.theme = m.theme
