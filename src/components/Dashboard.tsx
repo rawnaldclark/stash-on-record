@@ -691,7 +691,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 fun={fun}
                 rec={rec}
                 summary={summary}
-                devices={devices}
+                // Stash keeps no device for a play, so its liner notes leave Devices out
+                devices={EMBEDDED ? [] : devices}
                 topArtists={topArtists}
                 hours={hours}
                 wear={wear}

@@ -168,8 +168,10 @@ body::after {
   margin-left: 2px;
 }
 
+/* With a word beside it, it's a Stash button: the 12px squircle */
 .stash-play--text {
   padding: 0 18px 0 14px;
+  border-radius: 12px;
 }
 
 .stash-play:hover:not(:disabled) {
