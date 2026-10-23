@@ -92,6 +92,8 @@ const F_SKIPPED = 4
 const F_SHUFFLE = 8
 const F_REASONS = 32
 const F_LASTFM = 64
+/** A play made in Stash on the phone, from its export (spec §8): the Stash source, with this browser's own. */
+const F_STASH = 256
 
 /**
  * Stash's row as On Record's Play. Stash keeps the reasons as flags: CHOSEN is a play the listener started (`clickrow`), DONE one
@@ -119,7 +121,7 @@ export function toPlay(r: ArchivePlay): Play {
   }
 }
 
-export const sourceOf = (r: Pick<ArchivePlay, 'f'>): Source => (r.f & F_LASTFM ? 'lastfm' : 'spotify')
+export const sourceOf = (r: Pick<ArchivePlay, 'f'>): Source => (r.f & F_LASTFM ? 'lastfm' : r.f & F_STASH ? 'stash' : 'spotify')
 
 /** One of Stash's own plays as a Play: a full listen, started by the listener as far as anyone knows. */
 export function livePlay(p: LivePlay): Play {
@@ -169,7 +171,7 @@ export function stack(archive: Play[], live: LivePlay[], on: Record<Source, bool
   }
   const out: Play[] = []
   for (const p of archive) {
-    const src: Source = p.platform === SOURCE_LABEL.lastfm ? 'lastfm' : 'spotify'
+    const src: Source = p.platform === SOURCE_LABEL.lastfm ? 'lastfm' : p.platform === SOURCE_LABEL.stash ? 'stash' : 'spotify'
     if (!on[src]) continue
     if (src === 'lastfm') {
       const s = p.endTime - p.msPlayed
