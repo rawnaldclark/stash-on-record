@@ -6,6 +6,9 @@
 
 @font-face { font-family: 'Space Grotesk'; src: url(/fonts/space-grotesk-var.woff2) format('woff2'); font-weight: 500 700; font-display: swap; }
 @font-face { font-family: 'Inter'; src: url(/fonts/inter-var.woff2) format('woff2'); font-weight: 400 700; font-display: swap; }
+/* The player's metric-matched fallbacks (tokens.css), so the swap doesn't move the layout */
+@font-face { font-family: 'Space Grotesk Fallback'; src: local('Arial'); size-adjust: 111.7%; ascent-override: 88.09%; descent-override: 26.14%; line-gap-override: 0%; }
+@font-face { font-family: 'Inter Fallback'; src: local('Arial'); size-adjust: 107.61%; ascent-override: 90.03%; descent-override: 22.42%; line-gap-override: 0%; }
 
 :root {
   /* stash-player src/lib/styles/tokens.css, dark */
@@ -24,16 +27,116 @@
   --stash-action: #7c3aed;
   --violet: #a78bfa;
   --cyan: #22d3ee;
+  /* On Record's lime marks focus and what's picked; Stash marks both in cyan */
+  --lime: var(--cyan);
 
-  /* Space Grotesk for display (Stash's headings), Inter for the voice On Record gives its italic serif */
-  --display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
-  --serif: 'Inter', system-ui, -apple-system, sans-serif;
+  /*
+   * Space Grotesk for display (Stash's headings), Inter for the voice On Record gives its italic serif, and Inter for the
+   * letterspaced caps and figures it sets in mono: Stash's eyebrows are Inter, and its figures are tabular rather than mono.
+   * The record and the posters draw on canvas with On Record's own faces, so they keep their typography.
+   */
+  --display: 'Space Grotesk', 'Space Grotesk Fallback', system-ui, -apple-system, sans-serif;
+  --serif: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
+  --mono: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Stash has no film grain over its pages */
 body::after {
   content: none;
 }
+
+/* ---------- On Record's own colours, written as literals, in Stash's ---------- */
+
+/* Stash's buttons are 12px squircles; pills are for chips */
+.button {
+  border-radius: 12px;
+}
+
+/* The pink glows become the accent's */
+.button:hover {
+  box-shadow: 0 10px 34px -6px rgb(139 92 246 / 0.55);
+}
+
+.error {
+  background: rgb(139 92 246 / 0.1);
+  border-color: rgb(139 92 246 / 0.4);
+}
+
+.deck {
+  box-shadow: inset 0 0 40px rgb(139 92 246 / 0.05);
+}
+
+.scrubber::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgb(139 92 246 / 0.35);
+}
+
+.clock__wedge.is-on {
+  filter: drop-shadow(0 0 12px rgb(139 92 246 / 0.8));
+}
+
+.lovehate__zone--hot {
+  fill: rgb(139 92 246 / 0.06);
+}
+
+.launcher__list[aria-multiselectable='true'] .launcher__item[aria-selected='true'] {
+  background: rgb(139 92 246 / 0.14);
+}
+
+.launcher__list[aria-multiselectable='true'] .launcher__item.is-active {
+  box-shadow: inset 0 0 0 1px rgb(139 92 246 / 0.6);
+}
+
+@keyframes coach-press {
+  0% { opacity: 0; transform: scale(1.5); box-shadow: 0 0 0 0 rgb(139 92 246 / 0.8); }
+  10% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgb(139 92 246 / 0.8); }
+  32% { transform: scale(0.9); box-shadow: 0 0 0 16px rgb(139 92 246 / 0); }
+  78% { opacity: 1; transform: scale(0.9) translateY(34px); box-shadow: 0 0 0 16px rgb(139 92 246 / 0); }
+  90%, 100% { opacity: 0; transform: scale(1.1) translateY(34px); box-shadow: 0 0 0 16px rgb(139 92 246 / 0); }
+}
+
+/* Bars and readouts that float over the page take Stash's background, not On Record's warmer black */
+.topbar,
+.tour__top {
+  background: rgb(6 6 12 / 0.8);
+}
+
+.coach__label {
+  background: rgb(6 6 12 / 0.88);
+}
+
+.constellation__readout,
+.constellation__caption {
+  background: rgb(6 6 12 / 0.6);
+}
+
+.constellation__zoom {
+  background: rgb(6 6 12 / 0.72);
+}
+
+.constellation__reset {
+  background: rgb(6 6 12 / 0.82);
+}
+
+.modal::backdrop {
+  background: rgb(3 3 8 / 0.62);
+}
+
+.trackmenu__sheet {
+  box-shadow: 0 0 0 100vmax rgb(3 3 8 / 0.6);
+}
+
+/* Stash's eyebrows are cyan */
+.side__label,
+.hero__eyebrow span {
+  color: var(--cyan);
+}
+
+/*
+ * Stash's light theme (the player sends stash:theme, EmbedApp sets data-theme on <html>): the record stays dark in both, like an
+ * album sleeve on a light shelf. On Record's charts and palette are made for a dark surface, so on purpose nothing here keys off
+ * the theme, and `color-scheme: dark` keeps the native controls dark too. The frame's edge is the player's to draw.
+ */
 
 /* ---------- Play in Stash (PlayHere.tsx) ---------- */
 
@@ -190,4 +293,38 @@ body::after {
 
 .stash-credit a:hover {
   color: var(--text);
+}
+
+/* ---------- The top bar's name: "Your Spotify years", set as a Stash heading rather than On Record's wordmark ---------- */
+
+.brand {
+  text-transform: none;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+/* ---------- Where the play disc sits ---------- */
+
+/* Beside the needle's song: at the end of the line, without making the line any taller than its words */
+.vinyl__now .stash-play,
+.deck__now .stash-play {
+  margin-left: auto;
+}
+
+/* On the page, level with the time */
+.deck__now .stash-play {
+  align-self: flex-start;
+}
+
+.vinyl__now .stash-play {
+  align-self: center;
+  min-width: 40px;
+  height: 40px;
+  margin-block: -6px;
+}
+
+/* In the day sheet's head, the same size as the steps beside it */
+.day-panel--sheet .day-panel__nav .stash-play {
+  min-width: 40px;
+  height: 40px;
 }
