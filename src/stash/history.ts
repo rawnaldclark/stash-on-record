@@ -4,7 +4,7 @@
  * the player's back button that does nothing the listener can see. So inside Stash the record keeps no history of its own:
  *
  * - `history.pushState` does nothing. The deck and The Long Play check `history.state` for their own entry before they step back,
- *   find none, and so never call `history.back()` either: the player's back leaves Your Spotify years in one press.
+ *   find none, and so never call `history.back()` either: the player's back leaves Your record in one press.
  * - A popstate that still reaches the frame isn't the record's (it pushed nothing), so it stops here. That also keeps the deck's
  *   back-from-the-first-card, which on the site goes to the start page, from opening Stash's import sheet.
  * - A link to a section (#eras) scrolls there without a history entry.

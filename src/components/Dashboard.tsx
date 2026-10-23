@@ -491,14 +491,14 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         <a
           className="brand"
           href="#top"
-          aria-label={`${EMBEDDED ? 'Your Spotify years' : 'On Record'}, back to the ${cards ? 'first track' : 'top'}`}
+          aria-label={`${EMBEDDED ? 'Your record' : 'On Record'}, back to the ${cards ? 'first track' : 'top'}`}
           onClick={(e) => {
             if (!cards) return
             e.preventDefault()
             setCardStep(0)
           }}
         >
-          <span className="brand__name">{EMBEDDED ? 'Your Spotify years' : 'On Record'}</span>
+          <span className="brand__name">{EMBEDDED ? 'Your record' : 'On Record'}</span>
           <span className="brand__dot" aria-hidden="true" />
         </a>
         {/* Phones get a tracklist menu (with Poster and New data in it) and a dropdown for the year instead */}
@@ -691,8 +691,8 @@ export function Dashboard({ result, isSample, onReset }: Props) {
                 fun={fun}
                 rec={rec}
                 summary={summary}
-                // Stash keeps no device for a play, so its liner notes leave Devices out
-                devices={EMBEDDED ? [] : devices}
+                // Inside Stash a play's platform is its source (Spotify, Stash, Last.fm): Listened on
+                devices={devices}
                 topArtists={topArtists}
                 hours={hours}
                 wear={wear}

@@ -71,7 +71,7 @@ describe('toPlay', () => {
     expect(Object.keys(p).sort()).toEqual(
       ['album', 'artist', 'country', 'endTime', 'incognito', 'kind', 'msPlayed', 'offline', 'platform', 'reasonEnd', 'reasonStart', 'shuffle', 'skipped', 'title', 'uri'].sort(),
     )
-    expect(p.platform).toBe('')
+    expect(p.platform).toBe('Spotify') // its source, as the record's Listened on credit shows it
     expect(p.country).toBe('')
     expect(p.offline).toBe(false)
     expect(p.incognito).toBe(false)

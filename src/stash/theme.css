@@ -297,7 +297,7 @@ body::after {
   color: var(--text);
 }
 
-/* ---------- The top bar's name: "Your Spotify years", set as a Stash heading rather than On Record's wordmark ---------- */
+/* ---------- The top bar's name: "Your record", set as a Stash heading rather than On Record's wordmark ---------- */
 
 .brand {
   text-transform: none;
@@ -334,7 +334,7 @@ body::after {
 /* ---------- Inside the player's page ---------- */
 
 /*
- * The player's header above the frame already says "Your Spotify years" and holds Bring a newer copy (its page menu), so on the
+ * The player's header above the frame already says "Your record" and holds Bring a newer copy (its page menu), so on the
  * long page the record's own brand and that button would say it twice. The phone deck keeps its bar as it is: there the brand is
  * the dot that deals the first card, and New data lives in the tracklist menu.
  */

@@ -34,7 +34,7 @@ export function LinerNotes({ takes, fun, rec, summary, devices, topArtists, hour
     <div className="liner">
       <article className="backcover">
         <header className="backcover__top">
-          <span>{EMBEDDED ? 'Your Spotify years' : 'On Record'} · {period}</span>
+          <span>{EMBEDDED ? 'Your record' : 'On Record'} · {period}</span>
           <span>Liner notes</span>
         </header>
         <Headline takes={takes} />
@@ -107,7 +107,7 @@ function Credits({ fun, rec, summary, devices, topArtists, hours, isAllTime }: C
   if (devices.length) {
     const total = Math.max(summary.totalMs, 1)
     credits.push({
-      label: 'Devices',
+      label: EMBEDDED ? 'Listened on' : 'Devices',
       value: devices
         .slice(0, 3)
         .map((d) => `${d.label} ${formatPercent(d.ms / total)}`)
