@@ -4,6 +4,7 @@ import { COARSE } from '../lib/pointer'
 import { InCards, OnStage } from '../lib/stage'
 import { POSTER_DESIGN_SIZES, POSTER_SIZES, SOLID_PAPER_DESIGNS, isDarkPaper, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
 import { isLost, renderBlob, type RenderedImage } from '../viz/posterShared'
+import { EMBEDDED } from '../stash/embed'
 import { Segmented } from './ui'
 import { useCloseOnBack } from '../lib/back'
 
@@ -34,8 +35,8 @@ const IOS = COARSE && typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Maci
 /** On phones and tablets saving goes through the share sheet, the only way a web page can reach the camera roll */
 const SAVE_LABEL = IOS ? 'Save to Photos' : 'Save or share…'
 
-/** Every poster carries the same title */
-const TITLE = 'On Record'
+/** Every poster carries the same title; inside Stash, its name */
+const TITLE = EMBEDDED ? 'Stash' : 'On Record'
 
 /** Deep dive can also come out this many times bigger, so a single day's groove gets real pixels */
 const ULTRA_SCALES = [4, 3, 2]

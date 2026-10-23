@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useCloseOnBack } from '../lib/back'
+import { EMBEDDED } from '../stash/embed'
 
 /*
  * The tracklist for phones, where the side nav doesn't fit: the top bar names
@@ -105,7 +106,7 @@ export function TrackMenu({ tracks, sides, current, onPoster, onReset, onJump, u
               </a>
             )}
             <button type="button" className="button button--ghost button--small" onClick={onReset}>
-              New data
+              {EMBEDDED ? 'Bring a newer copy' : 'New data'}
             </button>
             <button
               type="button"

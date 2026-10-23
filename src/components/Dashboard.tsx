@@ -24,6 +24,7 @@ import { assignColors, OTHER, TOP_ARTISTS } from '../lib/palette'
 import { InCards, OnStage, resolveStop } from '../lib/stage'
 import { closeTopmost, useCloseOnBack } from '../lib/back'
 import { useSwipe } from '../lib/swipe'
+import { EMBEDDED } from '../stash/embed'
 import type { LoadResult } from '../types'
 import { layoutConstellation } from '../viz/constellation'
 import { posterMoments, type PosterData, type PosterDesign } from '../viz/poster'
@@ -490,14 +491,14 @@ export function Dashboard({ result, isSample, onReset }: Props) {
         <a
           className="brand"
           href="#top"
-          aria-label={cards ? 'On Record, back to the first track' : 'On Record, back to the top'}
+          aria-label={`${EMBEDDED ? 'Your Spotify years' : 'On Record'}, back to the ${cards ? 'first track' : 'top'}`}
           onClick={(e) => {
             if (!cards) return
             e.preventDefault()
             setCardStep(0)
           }}
         >
-          <span className="brand__name">On Record</span>
+          <span className="brand__name">{EMBEDDED ? 'Your Spotify years' : 'On Record'}</span>
           <span className="brand__dot" aria-hidden="true" />
         </a>
         {/* Phones get a tracklist menu (with Poster and New data in it) and a dropdown for the year instead */}
@@ -540,7 +541,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
             Poster
           </button>
           <button type="button" className="button button--ghost button--small" onClick={onReset}>
-            New data
+            {EMBEDDED ? 'Bring a newer copy' : 'New data'}
           </button>
         </div>
       </header>

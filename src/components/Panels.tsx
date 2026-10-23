@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { formatNumber } from '../lib/format'
 import { isLaunchKey } from '../lib/keys'
+import { StashCredit } from '../stash/PlayHere'
 
 interface ModalProps {
   open: boolean
@@ -136,6 +137,7 @@ export function SettingsPanel({ open, onClose, onGone, musicOnly, onMusicOnly, o
               : `Leaves out ${formatNumber(otherPlays)} podcast and audiobook play${otherPlays === 1 ? '' : 's'}.`}
         </p>
       </section>
+      <StashCredit />
     </Modal>
   )
 }

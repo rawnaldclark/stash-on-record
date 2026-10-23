@@ -1,6 +1,7 @@
 import type { Bins, RaceData } from '../data/insights'
 import { formatDate, formatHours, formatMonthShort } from '../lib/format'
 import { colorFor } from '../lib/palette'
+import { EMBEDDED } from '../stash/embed'
 import { clip, fit } from './posterShared'
 import { DISPLAY } from './record'
 
@@ -204,7 +205,7 @@ export function makeRaceFilm({ bins, race, colors, covers }: RaceScene): RaceFil
     ctx.textBaseline = 'alphabetic'
     ctx.fillStyle = soft
     ctx.font = font(700, 3 * u)
-    ctx.fillText('On Record', pad, H - 6 * u)
+    ctx.fillText(EMBEDDED ? 'Stash' : 'On Record', pad, H - 6 * u)
     ctx.restore()
   }
 

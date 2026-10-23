@@ -5,6 +5,7 @@ import { LAUNCH_KEY } from '../lib/keys'
 import { COARSE, PHONE } from '../lib/pointer'
 import { matches } from '../lib/search'
 import { arrow, hover, NO_SELECTION, settle, span, stretchTo } from '../lib/selection'
+import { EMBEDDED } from '../stash/embed'
 import { Modal } from './Panels'
 import type { Track } from './TrackMenu'
 
@@ -165,7 +166,10 @@ function LauncherBody({
         : []),
       { key: 'help', group: 'Commands', label: 'Help', hint: 'Getting your data, keys', run: () => onMode('help') },
       { key: 'about', group: 'Commands', label: 'About', hint: 'Source, license, credits', run: () => onMode('about') },
-      { key: 'reset', group: 'Commands', label: 'Clear Data', hint: 'Back to the start', terms: 'new load reset export file zip drop open', run: onReset },
+      // Inside Stash the history stays in the player's archive: this brings a newer export in through its import sheet
+      EMBEDDED
+        ? { key: 'reset', group: 'Commands', label: 'Bring a Newer Copy…', hint: 'Through Stash’s import', terms: 'new load reset export file zip drop open', run: onReset }
+        : { key: 'reset', group: 'Commands', label: 'Clear Data', hint: 'Back to the start', terms: 'new load reset export file zip drop open', run: onReset },
       ...tracks.map((t, i) => ({
         key: `track:${t.id}`,
         group: 'Go to…',

@@ -3,6 +3,7 @@ import type { GraphLink, GraphNode, Records } from '../data/insights'
 import { dayNumber, type FunStats, type WearOut } from '../data/stats'
 import { formatDate, formatDuration, formatNumber } from '../lib/format'
 import { mulberry32 } from '../lib/random'
+import { EMBEDDED } from '../stash/embed'
 import { starSize, type Layout } from './constellation'
 import { renderDeepPoster } from './posterDeep'
 import {
@@ -1113,7 +1114,7 @@ function footer(
   ctx.textAlign = 'right'
   ctx.font = `700 ${1.3 * u}px ${MONO}`
   spacing(ctx, '0.2em')
-  ctx.fillText('ON RECORD ●', W - pad, at.captionY)
+  ctx.fillText(EMBEDDED ? 'STASH ●' : 'ON RECORD ●', W - pad, at.captionY)
   spacing(ctx, '0px')
 }
 
