@@ -5,6 +5,7 @@ import { formatDuration, formatHour, formatLongDate, formatNumber, formatShortDa
 import { colorFor } from '../lib/palette'
 import { InCards } from '../lib/stage'
 import { useSwipe } from '../lib/swipe'
+import { PlayArtist, PlayDay, PlayDaySong } from '../stash/PlayHere'
 import type { Play } from '../types'
 import { Cover } from './Cover'
 import { Segmented } from './ui'
@@ -117,7 +118,9 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
     <ol className="day-panel__list">
       {topArtists.map((a) => (
         <li key={a.name}>
-          <Cover name={a.name} size={36} />
+          <PlayArtist plays={() => log} artist={a.name} from={`Every Day · ${formatLongDate(fromDayNumber(day))}`}>
+            <Cover name={a.name} size={36} />
+          </PlayArtist>
           <div className="day-panel__main">
             <span className="day-panel__name">{a.name}</span>
             <span className="day-panel__bar" aria-hidden="true">
@@ -134,7 +137,9 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
     <ol className="day-panel__list">
       {topSongs.map((s) => (
         <li key={s.key}>
-          <Cover name={`${s.title}|${s.artist}`} size={36} />
+          <PlayDaySong chapter="Every Day" date={fromDayNumber(day)} plays={() => log} songKey={s.key} title={s.title}>
+            <Cover name={`${s.title}|${s.artist}`} size={36} />
+          </PlayDaySong>
           <div className="day-panel__main">
             <span className="day-panel__name">{s.title}</span>
             <span className="day-panel__sub">{s.artist}</span>
@@ -184,6 +189,7 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
             )}
           </div>
           <div className="day-panel__nav">
+            <PlayDay chapter="Every Day" date={fromDayNumber(day)} plays={() => log} />
             <button type="button" className="day-panel__step" disabled={prev === null} onClick={() => prev !== null && onSelect(prev)} aria-label="Previous day with listening">
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                 <path d="M15 5l-7 7 7 7" />
@@ -259,6 +265,7 @@ export function DayPanel({ day, plays, firstHeard, colors, prev, next, onSelect,
             </span>
           )}
         </div>
+        <PlayDay chapter="Every Day" date={fromDayNumber(day)} plays={() => log} text="Play this day" />
         <button type="button" className="day-panel__close" onClick={onClose} aria-label="Close day details">
           ×
         </button>

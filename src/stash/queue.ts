@@ -5,6 +5,7 @@
  */
 import { COUNTED_PLAY_MS, trackKey, type Category, type Ranked } from '../data/stats'
 import type { Play } from '../types'
+import type { RecordModel } from '../viz/record'
 import type { StashSong } from './embed'
 
 /** A list to hand Stash and where in it to start. */
@@ -49,6 +50,21 @@ export function dayQueue(dayPlays: readonly Play[], from?: Play): Queue {
     index = placed.get(trackKey(from)) ?? Math.max(0, starts.findIndex((s) => s >= fromStart))
   }
   return { songs: songs.slice(0, MAX_QUEUE), index: Math.min(index, MAX_QUEUE - 1) }
+}
+
+/**
+ * The plays behind a groove of The Record (`arcs`, the day's arcs in the model), in the order they started. A play over midnight
+ * leaves an arc on both days; it counts once, on each.
+ */
+export function groovePlays(model: RecordModel, plays: readonly Play[], arcs: readonly number[]): Play[] {
+  const out: Play[] = []
+  const seen = new Set<number>()
+  for (const k of [...arcs].sort((a, b) => model.from[a] - model.from[b])) {
+    if (seen.has(model.play[k])) continue
+    seen.add(model.play[k])
+    out.push(plays[model.play[k]])
+  }
+  return out
 }
 
 /**

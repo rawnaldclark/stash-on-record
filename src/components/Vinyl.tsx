@@ -7,6 +7,8 @@ import { useMediaQuery, useSeen, useSize, useWidth } from '../lib/hooks'
 import { COARSE, useFingerDrag, useHoldDrag } from '../lib/pointer'
 import { InCards } from '../lib/stage'
 import { IDENTITY, usePanZoom, type View } from '../lib/zoom'
+import { PlayDay } from '../stash/PlayHere'
+import { groovePlays } from '../stash/queue'
 import type { Play } from '../types'
 import {
   GROOVE,
@@ -420,6 +422,9 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
     />
   )
 
+  // Inside Stash: the day plays from the needle's song (nothing outside Stash)
+  const playDay = <PlayDay chapter="The Record" date={date} plays={() => groovePlays(model, plays, day.arcs)} at={() => playing ?? next} disabled={!day.arcs.length} />
+
   const now = (
     <div className="deck__now">
       <span className="deck__time">{formatTime(at)}</span>
@@ -439,6 +444,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
           )}
         </span>
       )}
+      {playDay}
     </div>
   )
 
@@ -613,6 +619,7 @@ export function Vinyl({ plays, model, slotColors, legend, title, subtitle, onPos
             ) : (
               <span className="vinyl__track is-quiet">{next ? `Quiet until ${next.title}` : 'Quiet'}</span>
             )}
+            {playDay}
           </p>
           {strip}
         </div>

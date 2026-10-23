@@ -6,6 +6,7 @@ import { usePageScroll, useWidth } from '../lib/hooks'
 import { leaveUnlessTouch } from '../lib/pointer'
 import { SERIES } from '../lib/palette'
 import { InCards } from '../lib/stage'
+import { PlayList } from '../stash/PlayHere'
 import type { Play } from '../types'
 import { Cover } from './Cover'
 import { FloatTip } from './ui'
@@ -97,7 +98,9 @@ function DuelSide({ title, swatch, songs, fact, empty }: SideProps) {
       {hero ? (
         <>
           <div className="duel__hero">
-            <Cover name={`${hero.title}|${hero.artist}`} size={96} className="duel__cover" />
+            <PlayList songs={songs} from={`Love / Hate · ${title}`} label={`Play your ${title.toLowerCase()} songs in Stash`}>
+              <Cover name={`${hero.title}|${hero.artist}`} size={96} className="duel__cover" />
+            </PlayList>
             <div className="duel__info">
               <strong className="duel__title">{hero.title}</strong>
               <span className="duel__artist">{hero.artist}</span>

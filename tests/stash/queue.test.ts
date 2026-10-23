@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { topItems } from '../../src/data/stats'
-import { albumQueue, artistQueue, chartQueue, dayQueue, MAX_QUEUE, songOf, songsOf } from '../../src/stash/queue'
+import { albumQueue, artistQueue, chartQueue, dayQueue, groovePlays, MAX_QUEUE, songOf, songsOf } from '../../src/stash/queue'
+import type { RecordModel } from '../../src/viz/record'
 import { at, play } from '../helpers'
 
 describe('songOf', () => {
@@ -134,5 +135,14 @@ describe('chartQueue', () => {
   it('has nothing to play for podcasts or a missing row', () => {
     expect(chartQueue(plays, 'show', [], 0)).toEqual({ songs: [], index: 0 })
     expect(chartQueue(plays, 'artist', [], 3)).toEqual({ songs: [], index: 0 })
+  })
+})
+
+describe('groovePlays', () => {
+  it("puts a groove's plays in the order they started, a play split over midnight once", () => {
+    const plays = [play(at(2024, 1, 1, 23, 50), { title: 'Late' }), play(at(2024, 1, 2, 9), { title: 'Morning' }), play(at(2024, 1, 2, 7), { title: 'Early' })]
+    // Arcs 0 and 1 are both the late play (before and after midnight); arcs come in any order
+    const model = { from: Float32Array.from([1430, 0, 540, 420]), play: Int32Array.from([0, 0, 1, 2]) } as unknown as RecordModel
+    expect(groovePlays(model, plays, [2, 1, 3]).map((p) => p.title)).toEqual(['Late', 'Early', 'Morning'])
   })
 })

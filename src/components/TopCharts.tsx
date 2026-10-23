@@ -3,6 +3,7 @@ import { topItems, type Category, type RankBy, type Ranked } from '../data/stats
 import { formatDuration, formatNumber } from '../lib/format'
 import { useSize } from '../lib/hooks'
 import { InCards } from '../lib/stage'
+import { ChartPlay } from '../stash/PlayHere'
 import type { Play } from '../types'
 import { Cover } from './Cover'
 import { Segmented } from './ui'
@@ -89,7 +90,12 @@ export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
       </button>
     </p>
   )
-  const cover = (item: Ranked, size: number) => <Cover name={item.sublabel ? `${item.label}|${item.sublabel}` : item.label} size={size} />
+  // Inside Stash a cover also plays (ChartPlay); on its own it's just the cover
+  const cover = (item: Ranked, size: number) => (
+    <ChartPlay plays={plays} category={active} items={items} at={items.indexOf(item)}>
+      <Cover name={item.sublabel ? `${item.label}|${item.sublabel}` : item.label} size={size} />
+    </ChartPlay>
+  )
 
   if (card) {
     const head = CATEGORIES.find((c) => c.value === active)!.label.toLowerCase()
@@ -199,7 +205,7 @@ export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
             {items.slice(0, 3).map((item, i) => (
               <li key={item.key} className={`podium__spot podium__spot--${i + 1}`}>
                 <div className="podium__art">
-                  <Cover name={item.sublabel ? `${item.label}|${item.sublabel}` : item.label} size={220} />
+                  {cover(item, 220)}
                   <span className="podium__rank" aria-hidden="true">
                     {i + 1}
                   </span>
@@ -218,7 +224,7 @@ export function TopCharts({ plays, onHide, hidden, onManage }: Props) {
             {items.slice(3).map((item, i) => (
               <li key={item.key} className="chart-list__row">
                 <span className="chart-list__rank">{i + 4}</span>
-                <Cover name={item.sublabel ? `${item.label}|${item.sublabel}` : item.label} size={40} />
+                {cover(item, 40)}
                 <div className="chart-list__main">
                   <span className="chart-list__name">{item.label}</span>
                   {item.sublabel && <span className="chart-list__sub">{item.sublabel}</span>}

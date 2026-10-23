@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Category, Ranked } from '../data/stats'
+import { trackKey, type Category, type Ranked } from '../data/stats'
+import { formatLongDate } from '../lib/format'
 import type { Play } from '../types'
 import { EMBEDDED, playInStash } from './embed'
-import { chartQueue, type Queue } from './queue'
+import { chartQueue, dayQueue, songOf, songsOf, type Queue } from './queue'
 
 /*
  * Play in Stash: the one way the record hands music to the player. Upstream components render these where a day or a song is
@@ -81,6 +82,63 @@ export function PlayOver({ queue, from, label, children }: PlayProps & { childre
         <PlayGlyph />
       </button>
     </span>
+  )
+}
+
+interface DayProps {
+  /** The chapter it's in, for Stash's "playing from": The Record, Every Day */
+  chapter: string
+  date: Date
+  /** The day's plays in the order they started, asked for at the tap */
+  plays: () => readonly Play[]
+}
+
+/** A day plays in order, each song once (see dayQueue). `at` starts it at that play's song: where the needle is. */
+export function PlayDay({ chapter, date, plays, at, text, disabled, className }: DayProps & { at?: () => Play | null | undefined; text?: string; disabled?: boolean; className?: string }) {
+  const day = formatLongDate(date)
+  return (
+    <PlayHere
+      queue={() => dayQueue(plays(), at?.() ?? undefined)}
+      from={`${chapter} · ${day}`}
+      label={`Play ${day} in Stash`}
+      text={text}
+      disabled={disabled}
+      className={className}
+    />
+  )
+}
+
+/** A song's cover in a day's list: the day plays from that song */
+export function PlayDaySong({ chapter, date, plays, songKey, title, children }: DayProps & { songKey: string; title: string; children: ReactNode }) {
+  return (
+    <PlayOver
+      queue={() => {
+        const all = plays()
+        return dayQueue(all, all.find((p) => trackKey(p) === songKey))
+      }}
+      from={`${chapter} · ${formatLongDate(date)}`}
+      label={`Play ${formatLongDate(date)} from ${title} in Stash`}
+    >
+      {children}
+    </PlayOver>
+  )
+}
+
+/** An artist's cover: their songs from `plays`, most played first */
+export function PlayArtist({ plays, artist, from, children }: { plays: () => readonly Play[]; artist: string; from: string; children: ReactNode }) {
+  return (
+    <PlayOver queue={() => ({ songs: songsOf(plays(), (p) => p.artist === artist), index: 0 })} from={from} label={`Play ${artist} in Stash`}>
+      {children}
+    </PlayOver>
+  )
+}
+
+/** A cover that stands for a short list of songs (Love / Hate's sides): the list from the top */
+export function PlayList({ songs, from, label, children }: { songs: readonly { title: string; artist: string }[]; from: string; label: string; children: ReactNode }) {
+  return (
+    <PlayOver queue={() => ({ songs: songs.map(songOf), index: 0 })} from={from} label={label}>
+      {children}
+    </PlayOver>
   )
 }
 
