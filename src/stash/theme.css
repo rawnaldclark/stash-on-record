@@ -1,0 +1,34 @@
+/*
+ * Stash's look over On Record's layout (embed.html only). On Record names its colours and faces as tokens on :root, so Stash's are
+ * swapped in here and every chart, card and control follows. The fonts are the player's own (same origin, /fonts), not a copy.
+ * Chart colours stay On Record's (lib/palette.ts is checked for colour-blind separation on a near-black surface, as Stash's is).
+ */
+
+@font-face { font-family: 'Space Grotesk'; src: url(/fonts/space-grotesk-var.woff2) format('woff2'); font-weight: 500 700; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url(/fonts/inter-var.woff2) format('woff2'); font-weight: 400 700; font-display: swap; }
+
+:root {
+  /* stash-player src/lib/styles/tokens.css, dark */
+  --bg: #06060c;
+  --bg-raise: #0d0d18;
+  --surface: #0d0d18;
+  --surface-2: #1a1a2e;
+  --line: rgb(255 255 255 / 0.06);
+  --line-strong: rgb(255 255 255 / 0.14);
+  --text: #e8e8f0;
+  --muted: #a0a0b8;
+  --faint: #8c8ca6;
+  --accent: #8b5cf6;
+  --accent-ink: #ffffff;
+  --violet: #a78bfa;
+  --cyan: #22d3ee;
+
+  /* Space Grotesk for display (Stash's headings), Inter for the voice On Record gives its italic serif */
+  --display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --serif: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Stash has no film grain over its pages */
+body::after {
+  content: none;
+}

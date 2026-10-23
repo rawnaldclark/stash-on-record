@@ -67,7 +67,9 @@ function prerenderLanding(): Plugin {
     apply: 'build',
     transformIndexHtml: {
       order: 'post',
-      async handler(html) {
+      async handler(html, ctx) {
+        // Stash's embed (embed.html) opens on the record itself: nothing to prerender
+        if (!ctx.filename.endsWith('index.html')) return html
         const server = await createServer({
           configFile: false,
           plugins: [react()],
@@ -91,4 +93,6 @@ function prerenderLanding(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [react(), contentSecurityPolicy(), prerenderLanding()],
+  // embed.html: On Record inside the Stash player (src/stash/)
+  build: { rollupOptions: { input: { index: 'index.html', embed: 'embed.html' } } },
 })
