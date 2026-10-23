@@ -5,6 +5,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './stash/theme.css'
 import EmbedApp from './stash/EmbedApp'
+import { EMBEDDED } from './stash/embed'
+import { keepNoHistory } from './stash/history'
+
+if (EMBEDDED) keepNoHistory()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

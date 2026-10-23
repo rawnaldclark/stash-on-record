@@ -8,6 +8,12 @@ import { loadFromStash, onStash, tellStash } from './embed'
  * changed the archive (`stash:reload`) and which theme it shows (`stash:theme`).
  */
 
+/**
+ * `?demo=1` presses On Record's seeded sample instead of the archive: for screenshots and checks in a browser with no import.
+ * Nothing is read or written, and the sample is made on the spot, so it is harmless in any build.
+ */
+const DEMO = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1'
+
 const Dashboard = lazy(() => import('../components/Dashboard').then((m) => ({ default: m.Dashboard })))
 
 type State = { status: 'loading' } | { status: 'empty' } | { status: 'error' } | { status: 'ready'; result: LoadResult; n: number }
@@ -17,7 +23,7 @@ export default function EmbedApp() {
 
   const load = useCallback(async () => {
     try {
-      const result = await loadFromStash()
+      const result = DEMO ? (await import('../data/load')).loadSample() : await loadFromStash()
       setState((s) => (result.plays.length ? { status: 'ready', result, n: s.status === 'ready' ? s.n + 1 : 0 } : { status: 'empty' }))
       tellStash({ type: 'stash:ready', plays: result.plays.length })
     } catch {
@@ -40,7 +46,7 @@ export default function EmbedApp() {
     return (
       <Suspense fallback={<Pressing />}>
         {/* A new key per reload: the record starts over on the new plays, as it does after New data */}
-        <Dashboard key={state.n} result={state.result} isSample={false} onReset={bringNewer} />
+        <Dashboard key={state.n} result={state.result} isSample={DEMO} onReset={bringNewer} />
       </Suspense>
     )
   }

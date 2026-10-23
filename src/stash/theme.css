@@ -20,6 +20,8 @@
   --faint: #8c8ca6;
   --accent: #8b5cf6;
   --accent-ink: #ffffff;
+  /* Stash fills its action buttons a step deeper than the accent, so white reads on them (AA) */
+  --stash-action: #7c3aed;
   --violet: #a78bfa;
   --cyan: #22d3ee;
 
@@ -31,4 +33,161 @@
 /* Stash has no film grain over its pages */
 body::after {
   content: none;
+}
+
+/* ---------- Play in Stash (PlayHere.tsx) ---------- */
+
+/* Stash's primary action: a purple disc with a white glyph. 44px, the record's own step buttons' size */
+.stash-play {
+  display: inline-grid;
+  grid-auto-flow: column;
+  place-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--stash-action);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.stash-play svg {
+  /* The triangle's weight sits left of its box; nudge it to look centred */
+  margin-left: 2px;
+}
+
+.stash-play--text {
+  padding: 0 18px 0 14px;
+}
+
+.stash-play:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.stash-play:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.stash-play:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* A cover that plays: the art stays as it was, the glyph sits on it */
+.stash-play-over {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.stash-play-over__button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  /* The whole cover, and never less than a fingertip */
+  width: max(100%, 40px);
+  height: max(100%, 40px);
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The glyph's disc: sized to the cover, small on a list row and bigger on a podium */
+.stash-play-over__button svg {
+  box-sizing: content-box;
+  width: clamp(12px, 28%, 26px);
+  height: auto;
+  padding: clamp(5px, 9%, 14px);
+  padding-left: calc(clamp(5px, 9%, 14px) + 1px);
+  padding-right: calc(clamp(5px, 9%, 14px) - 1px);
+  border-radius: 50%;
+  background: var(--stash-action);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.45);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+/* With a mouse the glyph waits for the row; on a touch screen it's always there, or nobody would know */
+@media (hover: hover) {
+  .stash-play-over__button svg {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+
+  .stash-play-over:hover .stash-play-over__button svg,
+  .chart-list__row:hover .stash-play-over__button svg,
+  .day-panel__list li:hover .stash-play-over__button svg,
+  .podium__spot:hover .stash-play-over__button svg,
+  .duel__hero:hover .stash-play-over__button svg,
+  .stash-play-over__button:focus-visible svg {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.stash-play-over__button:hover svg {
+  background: var(--accent);
+}
+
+.stash-play-over__button:focus-visible {
+  outline-offset: 0;
+}
+
+/* The tap landed: a ring goes out from the button, once */
+.stash-play.is-sent,
+.stash-play-over.is-sent .stash-play-over__button svg {
+  animation: stash-sent 0.9s ease-out;
+}
+
+@keyframes stash-sent {
+  from { box-shadow: 0 0 0 0 rgb(139 92 246 / 0.7); }
+  to { box-shadow: 0 0 0 14px rgb(139 92 246 / 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stash-play,
+  .stash-play-over__button svg {
+    transition: none;
+  }
+
+  .stash-play.is-sent,
+  .stash-play-over.is-sent .stash-play-over__button svg {
+    animation: none;
+  }
+}
+
+/* ---------- The credit (StashCredit) ---------- */
+
+.stash-credit {
+  margin: 20px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 0.82rem;
+}
+
+.stash-credit a {
+  color: var(--muted);
+  text-decoration-color: var(--line-strong);
+}
+
+.stash-credit a:hover {
+  color: var(--text);
 }

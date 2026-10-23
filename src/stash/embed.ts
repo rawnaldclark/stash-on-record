@@ -34,8 +34,11 @@ export function tellStash(msg: ToStash): void {
 
 /** Plays `songs` from `index` in Stash, labelled `from` ("The Record · 3 March 2024"). */
 export function playInStash(songs: StashSong[], index = 0, from = 'Your Spotify years'): void {
-  const list = songs.filter((s) => s.title && s.artist).map((s) => (s.album ? { title: s.title, artist: s.artist, album: s.album } : { title: s.title, artist: s.artist }))
-  if (list.length) tellStash({ type: 'stash:play', songs: list, index: Math.max(0, Math.min(index, list.length - 1)), from })
+  const named = (s: StashSong) => !!(s.title && s.artist)
+  const list = songs.filter(named).map((s) => (s.album ? { title: s.title, artist: s.artist, album: s.album } : { title: s.title, artist: s.artist }))
+  // A nameless song left out ahead of the start moves the start with it
+  const start = songs.slice(0, Math.max(0, index)).filter(named).length
+  if (list.length) tellStash({ type: 'stash:play', songs: list, index: Math.min(start, list.length - 1), from })
 }
 
 /** Listens to the player; returns the unsubscribe. Only messages from the parent, from this origin. */
@@ -50,7 +53,7 @@ export function onStash(handler: (msg: FromStash) => void): () => void {
 }
 
 /** Stash's archive row (stash-player src/lib/spotify/plays.ts ArchivePlay; spec docs/spotify-export.md §3). */
-interface ArchivePlay {
+export interface ArchivePlay {
   id: string
   t: string
   a: string
