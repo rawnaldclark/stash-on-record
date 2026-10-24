@@ -347,3 +347,9 @@ body::after {
 .topbar__launch kbd {
   white-space: nowrap;
 }
+
+/* A real cover from the player (stash/covers.ts) sits where the drawn one did, filling its square */
+img.cover {
+  object-fit: cover;
+  background: var(--surface-2);
+}

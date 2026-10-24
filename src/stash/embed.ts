@@ -41,6 +41,8 @@ export type ToStash =
   | { type: 'stash:ready'; plays: number }
   /** How many plays each source has (before the switches), so the player shows a switch only for a source there is. */
   | { type: 'stash:counts'; counts: Record<Source, number> }
+  /** Real covers for the names On Record would draw (covers.ts): an artist, or a song's or album's words. */
+  | { type: 'stash:art'; asks: { id: string; artist: string; title?: string; album?: string }[] }
 
 /** What the player says to the frame. */
 export type FromStash =
@@ -50,6 +52,8 @@ export type FromStash =
   | { type: 'stash:live'; plays: LivePlay[] }
   /** Which sources the record shows. */
   | { type: 'stash:sources'; on: Record<Source, boolean> }
+  /** The covers asked for: an address, or null for none known. */
+  | { type: 'stash:covers'; covers: { id: string; url: string | null }[] }
 
 export function tellStash(msg: ToStash): void {
   if (EMBEDDED) window.parent.postMessage(msg, window.location.origin)

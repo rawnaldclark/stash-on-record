@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LoadResult, Play } from '../types'
+import { learnPlays } from './covers'
 import { countSources, loadFromStash, onStash, stack, tellStash, type LivePlay, type Source } from './embed'
 
 /*
@@ -60,6 +61,8 @@ export default function EmbedApp() {
   const result = useMemo<LoadResult | null>(() => {
     if (archive.status !== 'ready') return null
     const plays: Play[] = DEMO ? archive.result.plays : stack(archive.result.plays, live, on)
+    // Which cover names are songs, which albums, and each song's album (stash/covers.ts)
+    learnPlays(plays)
     return { ...archive.result, plays }
   }, [archive, live, on])
 

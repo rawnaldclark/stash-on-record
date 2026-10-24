@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react'
 import { hashString, mulberry32 } from '../lib/random'
+import { useStashCover } from '../stash/covers'
 
 /*
  * Generative "cover art". The export has no artwork and this app never calls
@@ -18,6 +19,9 @@ interface Props {
 
 export function Cover({ name, size = 48, className }: Props) {
   const id = useId()
+  // Inside Stash, the real cover once the player has found it (stash/covers.ts); the drawn one until then
+  const real = useStashCover(name)
+  if (real) return <img className={className ? `cover ${className}` : 'cover'} src={real} width={size} height={size} alt="" aria-hidden="true" loading="lazy" decoding="async" draggable={false} />
   const rand = mulberry32(hashString(name))
   const pick = <T,>(items: T[]) => items[Math.floor(rand() * items.length)]
 

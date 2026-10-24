@@ -42,12 +42,18 @@ const HEADERS = `/*
   Cache-Control: public, max-age=31536000, immutable
 `
 
+/**
+ * embed.html (On Record inside the Stash player) shows real covers, which the player finds and hands over: the two image servers
+ * they come from are its only additions. Still no requests of its own (connect-src stays 'none').
+ */
+const EMBED_CSP = CSP.replace("img-src 'self' data: blob:", "img-src 'self' data: blob: https://cdn-images.dzcdn.net https://e-cdns-images.dzcdn.net https://*.mzstatic.com")
+
 function contentSecurityPolicy(): Plugin {
   return {
     name: 'content-security-policy',
     apply: 'build',
-    transformIndexHtml: () => [
-      { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP }, injectTo: 'head-prepend' },
+    transformIndexHtml: (_html, ctx) => [
+      { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: ctx.filename.endsWith('embed.html') ? EMBED_CSP : CSP }, injectTo: 'head-prepend' },
     ],
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: '_headers', source: HEADERS })
