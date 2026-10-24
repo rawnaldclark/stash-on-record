@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 
 /** Tracks an element's content-box width */
 export function useWidth(ref: RefObject<HTMLElement | null>, fallback = 800): number {
@@ -49,19 +49,23 @@ export function prefersReducedMotion(): boolean {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-/** Counts from 0 up to `target` once `active` turns true */
+/** Counts from 0 up to `target` once `active` turns true, and from what it shows to a new `target` after that */
 export function useCountUp(target: number, active: boolean, duration = 1600): number {
   const reduced = prefersReducedMotion()
   const [value, setValue] = useState(0)
+  // What's showing: a new target (a play just added) counts on from here, not from 0 again
+  const shown = useRef(0)
   useEffect(() => {
     if (!active || reduced) return
     let frame = 0
+    const from = shown.current
     const start = performance.now()
     const tick = (now: number) => {
       // A frame's timestamp can be slightly before `start`, so clamp at both ends
       const t = Math.max(0, Math.min(1, (now - start) / duration))
       // Ease out: fast at first, settling at the end
-      setValue(target * (1 - Math.pow(1 - t, 4)))
+      shown.current = from + (target - from) * (1 - Math.pow(1 - t, 4))
+      setValue(shown.current)
       if (t < 1) frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)

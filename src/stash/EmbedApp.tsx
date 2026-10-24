@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LoadResult, Play } from '../types'
 import { learnPlays } from './covers'
 import { countSources, loadFromStash, onStash, stack, tellStash, type LivePlay, type Source } from './embed'
@@ -9,6 +9,10 @@ import { countSources, loadFromStash, onStash, stack, tellStash, type LivePlay, 
  * with a listen counted once; the player's switches pick which sources it shows (`stash:sources`). With nothing at all yet, one
  * button asks the player to open its import sheet. The player says when an import changed the archive (`stash:reload`) and
  * which theme it shows (`stash:theme`).
+ *
+ * Pressing is the slow part (every chart worked out again from every play), so it happens only for a real change: the same plays
+ * or sources sent again change nothing, and new plays of this browser's (a song just played) go into the record as it stands,
+ * without starting it over.
  */
 
 /**
@@ -21,14 +25,21 @@ const Dashboard = lazy(() => import('../components/Dashboard').then((m) => ({ de
 
 const ALL: Record<Source, boolean> = { spotify: true, stash: true, lastfm: true }
 
+/** The same plays, in the same order: nothing to press again. */
+const livePrint = (plays: readonly LivePlay[]) => plays.map((p) => `${p.s}|${p.ms}|${p.t}|${p.a}|${p.al ?? ''}`).join('\n')
+const sourcesPrint = (on: Record<Source, boolean>) => `${on.spotify}|${on.stash}|${on.lastfm}`
+
 type Archive = { status: 'loading' } | { status: 'error' } | { status: 'ready'; result: LoadResult }
 
 export default function EmbedApp() {
   const [archive, setArchive] = useState<Archive>({ status: 'loading' })
   const [live, setLive] = useState<LivePlay[]>([])
   const [on, setOn] = useState<Record<Source, boolean>>(ALL)
-  // A new record per change of what it's made of: it starts over on the new plays, as it does after New data
+  // A new record when the archive or the sources change: it starts over on the new plays, as it does after New data
   const [n, setN] = useState(0)
+  // What the record was last pressed with, to tell a real change from the same thing sent again
+  const livePrinted = useRef(livePrint([]))
+  const sourcesPrinted = useRef(sourcesPrint(ALL))
 
   const load = useCallback(async () => {
     try {
@@ -49,10 +60,18 @@ export default function EmbedApp() {
       if (m.type === 'stash:reload') void load()
       else if (m.type === 'stash:theme') document.documentElement.dataset.theme = m.theme
       else if (m.type === 'stash:live' && Array.isArray(m.plays)) {
-        setLive(m.plays.filter(validLive))
-        setN((x) => x + 1)
+        // This browser's plays: into the record as it stands (no starting over), and only when they're new
+        const plays = m.plays.filter(validLive)
+        const print = livePrint(plays)
+        if (print === livePrinted.current) return
+        livePrinted.current = print
+        setLive(plays)
       } else if (m.type === 'stash:sources' && m.on && typeof m.on === 'object') {
-        setOn({ spotify: m.on.spotify !== false, stash: m.on.stash !== false, lastfm: m.on.lastfm !== false })
+        const next = { spotify: m.on.spotify !== false, stash: m.on.stash !== false, lastfm: m.on.lastfm !== false }
+        const print = sourcesPrint(next)
+        if (print === sourcesPrinted.current) return
+        sourcesPrinted.current = print
+        setOn(next)
         setN((x) => x + 1)
       }
     })
