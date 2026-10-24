@@ -4,6 +4,7 @@ import { colorFor } from '../lib/palette'
 import { EMBEDDED } from '../stash/embed'
 import { clip, fit } from './posterShared'
 import { DISPLAY } from './record'
+import { drawWordmark } from '../stash/wordmark'
 
 /*
  * The Race as a 9:16 story video. Drawn frame by frame onto a canvas at the same pace as the page,
@@ -205,7 +206,8 @@ export function makeRaceFilm({ bins, race, colors, covers }: RaceScene): RaceFil
     ctx.textBaseline = 'alphabetic'
     ctx.fillStyle = soft
     ctx.font = font(700, 3 * u)
-    ctx.fillText(EMBEDDED ? 'Stash' : 'On Record', pad, H - 6 * u)
+    if (EMBEDDED) drawWordmark(ctx, pad, H - 6 * u, 2.3 * u)
+    else ctx.fillText('On Record', pad, H - 6 * u)
     ctx.restore()
   }
 

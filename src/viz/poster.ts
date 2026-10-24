@@ -4,6 +4,7 @@ import { dayNumber, type FunStats, type WearOut } from '../data/stats'
 import { formatDate, formatDuration, formatNumber } from '../lib/format'
 import { mulberry32 } from '../lib/random'
 import { EMBEDDED } from '../stash/embed'
+import { drawWordmark } from '../stash/wordmark'
 import { starSize, type Layout } from './constellation'
 import { renderDeepPoster } from './posterDeep'
 import {
@@ -745,7 +746,8 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
   ctx.fillStyle = '#f4f1ea'
   ctx.font = `700 ${1.3 * u}px ${MONO}`
   spacing(ctx, '0.2em')
-  ctx.fillText(EMBEDDED ? 'STASH ●' : 'ON RECORD ●', kx + 1.6 * u, ky + 2.8 * u)
+  if (EMBEDDED) drawWordmark(ctx, kx + 1.6 * u, ky + 2.8 * u, 1.05 * u)
+  else ctx.fillText('ON RECORD ●', kx + 1.6 * u, ky + 2.8 * u)
   ctx.textAlign = 'right'
   ctx.fillStyle = 'rgba(244, 241, 234, 0.6)'
   ctx.fillText(data.period, kx + cw - 1.6 * u, ky + 2.8 * u)
@@ -1114,7 +1116,8 @@ function footer(
   ctx.textAlign = 'right'
   ctx.font = `700 ${1.3 * u}px ${MONO}`
   spacing(ctx, '0.2em')
-  ctx.fillText(EMBEDDED ? 'STASH ●' : 'ON RECORD ●', W - pad, at.captionY)
+  if (EMBEDDED) drawWordmark(ctx, W - pad, at.captionY, 1.05 * u, 'right')
+  else ctx.fillText('ON RECORD ●', W - pad, at.captionY)
   spacing(ctx, '0px')
 }
 
