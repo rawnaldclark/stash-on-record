@@ -244,7 +244,7 @@ export async function makeRaceVideo(scene: RaceScene, onProgress: (fraction: num
     const { blob, type } = mode === 'encode' ? await encode(canvas, ctx, film, onProgress, signal) : await record(canvas, ctx, film, onProgress, signal)
     onProgress(1)
     const { first: yearA, last: yearB } = raceYears(scene.bins)
-    const name = `on-record-${yearA === yearB ? yearA : `${yearA}-${yearB}`}-race.${type === 'video/mp4' ? 'mp4' : 'webm'}`
+    const name = `${EMBEDDED ? 'stash-record' : 'on-record'}-${yearA === yearB ? yearA : `${yearA}-${yearB}`}-race.${type === 'video/mp4' ? 'mp4' : 'webm'}`
     return new File([blob], name, { type })
   } finally {
     canvas.width = canvas.height = 0

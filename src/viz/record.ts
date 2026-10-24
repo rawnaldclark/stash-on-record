@@ -2,6 +2,7 @@ import { dayNumber, fromDayNumber, startDate } from '../data/stats'
 import { formatHour, formatMonthShort } from '../lib/format'
 import { TOP_ARTISTS } from '../lib/palette'
 import type { Play } from '../types'
+import { EMBEDDED } from '../stash/embed'
 
 /*
  * The vinyl record, shared by the on-screen chart and the poster. Each groove
@@ -362,7 +363,7 @@ export function drawRecord(ctx: CanvasRenderingContext2D, model: RecordModel, o:
   ctx.font = `500 ${lr * 0.11}px ${MONO}`
   ctx.fillText(o.subtitle, c, c + lr * 0.36)
   ctx.font = `italic ${lr * 0.17}px ${SERIF}`
-  ctx.fillText('on record', c, c + lr * 0.6)
+  ctx.fillText(EMBEDDED ? 'stash' : 'on record', c, c + lr * 0.6)
   ctx.beginPath()
   ctx.arc(c, c, lr * 0.065, 0, TAU)
   ctx.fill()

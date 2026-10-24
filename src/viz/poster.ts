@@ -745,7 +745,7 @@ function macroPoster(ctx: CanvasRenderingContext2D, data: PosterData, W: number,
   ctx.fillStyle = '#f4f1ea'
   ctx.font = `700 ${1.3 * u}px ${MONO}`
   spacing(ctx, '0.2em')
-  ctx.fillText('ON RECORD ●', kx + 1.6 * u, ky + 2.8 * u)
+  ctx.fillText(EMBEDDED ? 'STASH ●' : 'ON RECORD ●', kx + 1.6 * u, ky + 2.8 * u)
   ctx.textAlign = 'right'
   ctx.fillStyle = 'rgba(244, 241, 234, 0.6)'
   ctx.fillText(data.period, kx + cw - 1.6 * u, ky + 2.8 * u)

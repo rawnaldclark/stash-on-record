@@ -112,7 +112,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   // Only some designs offer the solid backgrounds; elsewhere a solid pick falls back to its textured twin
   const papers = SOLID_PAPER_DESIGNS.includes(design) ? [...PAPERS, ...SOLID_PAPERS] : PAPERS
   const activePaper = papers.some((p) => p.value === paper) ? paper : isDarkPaper(paper) ? 'midnight' : 'cream'
-  const fileName = `on-record-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
+  const fileName = `${EMBEDDED ? 'stash-record' : 'on-record'}-${data.period.replace(/[^\d–-]+/g, '').replace('–', '-') || 'all-time'}-${design}.png`
   const optionsKey = `${design}|${activeSize}|${activePaper}`
 
   useEffect(() => {
