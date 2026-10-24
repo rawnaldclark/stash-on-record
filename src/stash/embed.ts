@@ -41,6 +41,8 @@ export type ToStash =
   | { type: 'stash:ready'; plays: number }
   /** How many plays each source has (before the switches), so the player shows a switch only for a source there is. */
   | { type: 'stash:counts'; counts: Record<Source, number> }
+  /** Close the record held full screen on a phone (StashClose), back to the player's page. */
+  | { type: 'stash:close' }
   /** Real covers for the names On Record would draw (covers.ts): an artist, or a song's or album's words. */
   | { type: 'stash:art'; asks: { id: string; artist: string; title?: string; album?: string }[] }
 

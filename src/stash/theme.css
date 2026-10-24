@@ -353,3 +353,24 @@ img.cover {
   object-fit: cover;
   background: var(--surface-2);
 }
+
+/* The way back to Stash on a phone's deck (StashClose): a round button at the top bar's start, a thumb's size */
+.stash-close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  margin-right: 4px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.stash-close:active {
+  transform: scale(0.94);
+}

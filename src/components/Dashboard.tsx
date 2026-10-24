@@ -25,6 +25,7 @@ import { InCards, OnStage, resolveStop } from '../lib/stage'
 import { closeTopmost, useCloseOnBack } from '../lib/back'
 import { useSwipe } from '../lib/swipe'
 import { EMBEDDED } from '../stash/embed'
+import { StashClose } from '../stash/StashClose'
 import type { LoadResult } from '../types'
 import { layoutConstellation } from '../viz/constellation'
 import { posterMoments, type PosterData, type PosterDesign } from '../viz/poster'
@@ -488,6 +489,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
   return (
     <div className={['dash', touring && 'is-touring', cards && 'is-cards', updating && 'is-updating'].filter(Boolean).join(' ')}>
       <header className="topbar" ref={topbarRef}>
+        {EMBEDDED && cards && <StashClose />}
         <a
           className="brand"
           href="#top"
