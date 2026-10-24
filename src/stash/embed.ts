@@ -183,11 +183,17 @@ export function stack(archive: Play[], live: LivePlay[], on: Record<Source, bool
   return out.sort((a, b) => a.endTime - b.endTime)
 }
 
-/** How many plays each source brings, before the switches (a scrobble Stash's own play covers counts as Stash's). */
+/** A listen, as every count in Stash means it: 30 s or more (shorter starts are skips). */
+const LISTEN_MS = 30_000
+
+/**
+ * How many listens each source brings, before the switches (a scrobble Stash's own play covers counts as Stash's). Listens, not
+ * every start, so the switches agree with Settings and the import's numbers.
+ */
 export function countSources(archive: Play[], live: LivePlay[]): Record<Source, number> {
   const all = stack(archive, live, { spotify: true, stash: true, lastfm: true })
   const counts: Record<Source, number> = { spotify: 0, stash: 0, lastfm: 0 }
-  for (const p of all) counts[p.platform === SOURCE_LABEL.lastfm ? 'lastfm' : p.platform === SOURCE_LABEL.stash ? 'stash' : 'spotify']++
+  for (const p of all) if (p.msPlayed >= LISTEN_MS) counts[p.platform === SOURCE_LABEL.lastfm ? 'lastfm' : p.platform === SOURCE_LABEL.stash ? 'stash' : 'spotify']++
   return counts
 }
 
