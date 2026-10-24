@@ -179,7 +179,12 @@ export function stack(archive: Play[], live: LivePlay[], on: Record<Source, bool
     }
     out.push(p)
   }
-  if (on.stash) for (const p of live) out.push(livePlay(p))
+  // A play the archive keeps already (the phone's, from its export) is one play: Stash's import puts the export's recent plays in
+  // the player's library too, so the same song and start can come both ways. The archive's copy, with its time played, is kept.
+  if (on.stash) {
+    const kept = new Set(archive.map((p) => `${fold(p.title)}|${fold(p.artist)}|${p.endTime - p.msPlayed}`))
+    for (const p of live) if (!kept.has(`${fold(p.t)}|${fold(p.a)}|${p.s}`)) out.push(livePlay(p))
+  }
   return out.sort((a, b) => a.endTime - b.endTime)
 }
 

@@ -39,3 +39,14 @@ describe('stacking the sources', () => {
     expect(livePlay({ t: 'X', a: 'Y', s: T, ms: 1000 })).toMatchObject({ endTime: T + 1000, msPlayed: 1000, kind: 'track', platform: 'Stash', reasonEnd: 'trackdone', skipped: false })
   })
 })
+
+describe('one play, two ways in', () => {
+  it('keeps the archive’s copy of a phone play the player also sends as its own', () => {
+    const phone = toPlay({ id: 'x', t: 'Song', a: 'Band', s: T, ms: 150_000, f: 256 })
+    const all = stack([phone], [{ t: 'Song', a: 'Band', s: T, ms: 180_000 }, { t: 'New', a: 'Band', s: T + 1, ms: 180_000 }], { spotify: true, stash: true, lastfm: true })
+    expect(all.map((p) => [p.title, p.msPlayed])).toEqual([
+      ['Song', 150_000],
+      ['New', 180_000],
+    ])
+  })
+})
