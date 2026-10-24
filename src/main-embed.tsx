@@ -8,13 +8,18 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './stash/theme.css'
 import EmbedApp from './stash/EmbedApp'
-import { EMBEDDED } from './stash/embed'
+import { EMBEDDED, tellStash } from './stash/embed'
 import { keepNoHistory } from './stash/history'
 
 if (EMBEDDED) {
   keepNoHistory()
   // A file dropped on the record would open in the frame in its place: the player's import sheet is where files go
   for (const t of ['dragover', 'drop'] as const) window.addEventListener(t, (e) => e.preventDefault())
+  // Escape with nothing of the record's open (its sheets and menus take theirs first) closes the record held full screen on a
+  // phone: the player ignores it otherwise
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('dialog[open], [aria-expanded="true"]')) tellStash({ type: 'stash:close' })
+  })
 }
 
 createRoot(document.getElementById('root')!).render(
