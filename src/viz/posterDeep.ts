@@ -3,6 +3,8 @@ import { formatDate, formatNumber } from '../lib/format'
 import { isDarkPaper, type PosterData, type PosterPaper } from './poster'
 import { DISPLAY, MINUTES, SLOT_OTHER, TAU, drawRecord, mix, quietestMinute, recordGeometry, type RecordModel } from './record'
 import { clip, clock, curveThrough, driftScale, fit, monthly, pill, wrap } from './posterShared'
+import { EMBEDDED } from '../stash/embed'
+import { drawWordmark, wordmarkFor } from '../stash/wordmark'
 
 /*
  * The Deep dive poster (4:5): dense and made to be read up close, like a post on r/dataisbeautiful.
@@ -579,9 +581,11 @@ export function renderDeepPoster(ctx: CanvasRenderingContext2D, W: number, H: nu
   ctx.fillStyle = soft
   ctx.font = font(500, 1.25 * u)
   ctx.textAlign = 'left'
-  ctx.fillText(`Data: my Spotify Extended Streaming History, ${formatDate(firstDate)} – ${formatDate(lastDate)}.`, pad, H - 1.8 * u)
+  // Inside Stash the history is every source stacked (Spotify, Stash, Last.fm), and the credit is Stash's own wordmark
+  ctx.fillText(`${EMBEDDED ? 'Data: my listening history' : 'Data: my Spotify Extended Streaming History'}, ${formatDate(firstDate)} – ${formatDate(lastDate)}.`, pad, H - 1.8 * u)
   ctx.textAlign = 'right'
-  ctx.fillText('Made using mylisteningrecord.com', W - pad, H - 1.8 * u)
+  if (EMBEDDED) drawWordmark(ctx, W - pad, H - 1.8 * u, wordmarkFor(1.25 * u * 0.72 * 1.4), 'right')
+  else ctx.fillText('Made using mylisteningrecord.com', W - pad, H - 1.8 * u)
   ctx.textAlign = 'left'
   ctx.restore()
 }

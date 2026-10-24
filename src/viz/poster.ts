@@ -4,7 +4,7 @@ import { dayNumber, type FunStats, type WearOut } from '../data/stats'
 import { formatDate, formatDuration, formatNumber } from '../lib/format'
 import { mulberry32 } from '../lib/random'
 import { EMBEDDED } from '../stash/embed'
-import { drawWordmark } from '../stash/wordmark'
+import { drawWordmark, wordmarkFor } from '../stash/wordmark'
 import { starSize, type Layout } from './constellation'
 import { renderDeepPoster } from './posterDeep'
 import {
@@ -267,7 +267,9 @@ export function renderPoster(ctx: CanvasRenderingContext2D, W: number, H: number
     ctx.fillStyle = p.ink
     spacing(ctx, '-0.02em')
     ctx.font = `800 ${titleSize}px ${DISPLAY}`
-    ctx.fillText(o.title, pad - 0.3 * u, titleY)
+    // Inside Stash the title is the Stash wordmark, its capitals as tall as the type's would be
+    if (EMBEDDED) drawWordmark(ctx, pad, titleY, wordmarkFor(titleSize * 0.72, W - 2 * pad))
+    else ctx.fillText(o.title, pad - 0.3 * u, titleY)
     spacing(ctx, '0px')
     ctx.font = `italic ${4.6 * u}px ${SERIF}`
     ctx.fillStyle = p.dark ? accent : darken(accent)
@@ -387,6 +389,13 @@ function sleeveArt(ctx: CanvasRenderingContext2D, data: PosterData, o: PosterOpt
   fitText(ctx, data.subtitle, sx + cp, sy + cp + S * 0.16, inner, S * 0.075, `italic {px}px ${SERIF}`)
 
   const titleBase = sy + S - cp
+
+  // Inside Stash the sleeve's name is the Stash wordmark, as wide as the sleeve allows
+  if (EMBEDDED) {
+    ctx.fillStyle = coverInk
+    drawWordmark(ctx, sx + cp, titleBase, wordmarkFor(S * 0.2 * 0.72, inner))
+    return
+  }
 
   // The title, broken onto two lines when that lets it run bigger
   const lines = splitTitle(o.title)

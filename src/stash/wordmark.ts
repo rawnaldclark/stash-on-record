@@ -18,6 +18,15 @@ let paths: [number, Path2D][] | null = null
 
 /** How wide the wordmark is at height `h`. */
 export const wordmarkWidth = (h: number) => (h / VIEW.h) * VIEW.w
+/** The glyphs stand on a baseline this far down their box (font units: baseline at 1020, box from 290): text-aligned placing. */
+const BASELINE = (1020 - VIEW.y) / VIEW.h
+/** Their capitals are 730 of the box's units tall: a wordmark matching a typeface's cap height is this much taller. */
+export const CAP = 730 / VIEW.h
+
+/**
+ * The box height that sets the wordmark's capitals as tall as `capPx` (a typeface's cap height), never wider than `maxW`.
+ */
+export const wordmarkFor = (capPx: number, maxW = Infinity) => Math.min(capPx / CAP, maxW / (VIEW.w / VIEW.h))
 
 /**
  * Draws the wordmark `h` tall in the current fill: at `x` by `align`, at `y` by `baseline` (its middle, or its foot as text sits).
@@ -34,7 +43,7 @@ export function drawWordmark(
   const s = h / VIEW.h
   const w = VIEW.w * s
   const left = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x
-  const top = baseline === 'middle' ? y - h / 2 : y - h
+  const top = baseline === 'middle' ? y - h / 2 : y - h * BASELINE
   if (typeof Path2D === 'undefined') {
     ctx.fillText('STASH', left, top + h)
     return
