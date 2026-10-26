@@ -5,12 +5,21 @@
  * Stash already read the listener's export into its own IndexedDB database (`stash-spotify`, same origin): the plays come from
  * there, nothing is dropped twice. Songs and days play in Stash: the frame asks the player with postMessage (same origin only), so
  * the music keeps going while the record is open. Nothing here makes a network request.
+ *
+ * The Stash app on Android opens the same page in a WebView (?embed=stash-app). The app is the host there: the same messages go
+ * over its bridge instead (transport.ts), and the archive comes from the app rather than IndexedDB (app.ts).
  */
 import type { LoadResult, Play } from '../types'
+import { appHostOf, appTransport, frameTransport, inPlayerFrame, type Transport } from './transport'
 
-/** True inside the Stash player's frame. False when prerendering or opened on its own. */
-export const EMBEDDED =
-  typeof window !== 'undefined' && window.parent !== window && new URLSearchParams(window.location.search).get('embed') === 'stash'
+const win = typeof window === 'undefined' ? undefined : window
+const appHost = win ? appHostOf(win) : null
+
+/** True inside the Stash app on Android: ?embed=stash-app, with the app's StashHost bridge on the window. */
+export const APP_HOST = appHost !== null
+
+/** True inside Stash: the player's frame, or the Stash app. False when prerendering or opened on its own. */
+export const EMBEDDED = APP_HOST || (win !== undefined && inPlayerFrame(win))
 
 /** A song as Stash knows it: its words. Stash finds it on its sources when it plays. */
 export interface StashSong {
@@ -45,6 +54,11 @@ export type ToStash =
   | { type: 'stash:close' }
   /** Real covers for the names On Record would draw (covers.ts): an artist, or a song's or album's words. */
   | { type: 'stash:art'; asks: { id: string; artist: string; title?: string; album?: string }[] }
+  /**
+   * The app only (app.ts): the record listens now, so the app can answer (its bridge replies to a page that has spoken) with the
+   * archive. Sent on load and again on stash:reload. `v` is the protocol's version.
+   */
+  | { type: 'stash:hello'; v: 1 }
 
 /** What the player says to the frame. */
 export type FromStash =
@@ -56,9 +70,32 @@ export type FromStash =
   | { type: 'stash:sources'; on: Record<Source, boolean> }
   /** The covers asked for: an address, or null for none known. */
   | { type: 'stash:covers'; covers: { id: string; url: string | null }[] }
+  /**
+   * The app only (app.ts): its archive, every source already stacked, in chunks answering a hello. `seq` counts from 0 for each
+   * hello; `done` marks the last chunk.
+   */
+  | { type: 'stash:archive'; rows: ArchivePlay[]; seq: number; done: boolean }
+  /** The app only: its back gesture. What's open over the record closes first; with nothing open, the record. */
+  | { type: 'stash:back' }
+
+/**
+ * What the app may send; anything else from it is dropped. Not `stash:live`: the app stacks every source itself and sends one
+ * archive, and this browser's plays (the frame's `stash:live`) would be a second copy of the phone's own.
+ */
+const FROM_APP: ReadonlySet<string> = new Set([
+  'stash:reload',
+  'stash:theme',
+  'stash:sources',
+  'stash:covers',
+  'stash:archive',
+  'stash:back',
+] satisfies FromStash['type'][])
+
+/** None when prerendering: there's no window, and no one to talk to. */
+const transport: Transport | null = appHost ? appTransport(appHost, FROM_APP) : win ? frameTransport(win) : null
 
 export function tellStash(msg: ToStash): void {
-  if (EMBEDDED) window.parent.postMessage(msg, window.location.origin)
+  if (EMBEDDED) transport?.send(msg)
 }
 
 /** Plays `songs` from `index` in Stash, labelled `from` ("The Record · 3 March 2024"). */
@@ -70,15 +107,13 @@ export function playInStash(songs: StashSong[], index = 0, from = 'Your record')
   if (list.length) tellStash({ type: 'stash:play', songs: list, index: Math.min(start, list.length - 1), from })
 }
 
-/** Listens to the player; returns the unsubscribe. Only messages from the parent, from this origin. */
+/**
+ * Listens to Stash; returns the unsubscribe. In the player's frame, only messages from the parent, from this origin; in the app,
+ * only the messages it may send (FROM_APP).
+ */
 export function onStash(handler: (msg: FromStash) => void): () => void {
-  const listen = (e: MessageEvent) => {
-    if (e.source !== window.parent || e.origin !== window.location.origin) return
-    const m = e.data as FromStash | null
-    if (m && typeof m === 'object' && typeof m.type === 'string' && m.type.startsWith('stash:')) handler(m)
-  }
-  window.addEventListener('message', listen)
-  return () => window.removeEventListener('message', listen)
+  if (!transport) return () => {}
+  return transport.listen((m) => handler(m as FromStash))
 }
 
 /** Stash's archive row (stash-player src/lib/spotify/plays.ts ArchivePlay; spec docs/spotify-export.md §3). */
@@ -221,10 +256,18 @@ async function hasDb(): Promise<boolean> {
   }
 }
 
-/** Every imported play, oldest first (On Record sorts by end time). Empty when this browser has no import. */
+/**
+ * The record's plays from Stash's archive rows, oldest first (On Record sorts by end time): the same for the rows this browser
+ * keeps and the rows the app sends.
+ */
+export function fromArchive(rows: readonly ArchivePlay[]): LoadResult {
+  const plays = rows.map(toPlay).sort((a, b) => a.endTime - b.endTime)
+  return { plays, filesRead: plays.length ? ['Your Spotify history in Stash'] : [], skippedRows: 0, duplicateRows: 0, warnings: [] }
+}
+
+/** Every imported play, oldest first. Empty when this browser has no import. */
 export async function loadFromStash(): Promise<LoadResult> {
-  const empty: LoadResult = { plays: [], filesRead: [], skippedRows: 0, duplicateRows: 0, warnings: [] }
-  if (!(await hasDb())) return empty
+  if (!(await hasDb())) return fromArchive([])
   const rows = await new Promise<ArchivePlay[]>((resolve, reject) => {
     // No version: open whatever Stash made, never upgrade it (that's the player's job).
     const req = indexedDB.open(DB)
@@ -241,6 +284,5 @@ export async function loadFromStash(): Promise<LoadResult> {
       get.onsuccess = () => (db.close(), resolve(get.result as ArchivePlay[]))
     }
   })
-  const plays = rows.map(toPlay).sort((a, b) => a.endTime - b.endTime)
-  return { ...empty, plays, filesRead: plays.length ? ['Your Spotify history in Stash'] : [] }
+  return fromArchive(rows)
 }
