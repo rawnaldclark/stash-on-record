@@ -14,6 +14,9 @@ import { makeRaceVideo, raceVideoMode } from '../viz/raceVideo'
  * only Cancel, or new data for the race (a new year or filter remounts it), stops it.
  */
 
+/** Inside the Stash app, when the app didn't take the video (no answer in time): in the note's place, the buttons free again */
+const LOST_NOTE = 'Stash didn’t take the video. Try again.'
+
 type Phase = { kind: 'idle' } | { kind: 'rendering'; progress: number } | { kind: 'done'; file: File; url: string } | { kind: 'error' }
 
 interface Props {
@@ -32,6 +35,8 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   // Inside the Stash app: the video on its way to the app, chunk by chunk (stash/save.ts). Never set on the web
   const [sending, setSending] = useState<SaveAction | null>(null)
+  // Inside the Stash app: the app didn't take the video (stash/save.ts gave it up), said in the note until the next try
+  const [lost, setLost] = useState(false)
   const abort = useRef<AbortController | null>(null)
   const url = phase.kind === 'done' ? phase.url : null
   // Rendering, or showing what it made: either way the race on the page waits
@@ -54,6 +59,7 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
     const controller = new AbortController()
     abort.current = controller
     setPhase({ kind: 'rendering', progress: 0 })
+    setLost(false)
     const { covers, urls } = await loadCovers(board.current, race.names)
     try {
       const file = await makeRaceVideo(
@@ -99,10 +105,12 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
   /** Inside the Stash app, which saves the video or opens the share sheet with it: the buttons wait until it's all handed over */
   async function toApp(file: File, action: SaveAction) {
     setSending(action)
+    setLost(false)
     try {
       await handToApp(file, file.name, action)
     } catch (err) {
       console.error(err)
+      setLost(true)
     } finally {
       setSending(null)
     }
@@ -120,7 +128,7 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
         <section className="race-share" aria-label="Your race video">
           <video className="race-share__video" src={phase.url} autoPlay muted loop playsInline aria-label="Your race as a story video" />
           <p className="race-share__title">Your race, ready for your story</p>
-          <p className="race-share__note">Made on your phone. Nothing was uploaded.</p>
+          <p className="race-share__note">{lost ? LOST_NOTE : 'Made on your phone. Nothing was uploaded.'}</p>
           {shareable ? (
             <button type="button" className="button race-share__go" onClick={() => share(file, phase.url)} disabled={handing} autoFocus>
               <ShareIcon />
@@ -149,7 +157,7 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
         <video className="race-export__video" src={phase.url} autoPlay muted loop playsInline aria-label="Your race as a story video" />
         <div className="race-export__side">
           <p className="race-export__title">Your race, ready for your story</p>
-          <p className="field__note">1080 × 1920 · made on your device, nothing uploaded</p>
+          <p className="field__note">{lost ? LOST_NOTE : '1080 × 1920 · made on your device, nothing uploaded'}</p>
           <div className="race-export__actions">
             {shareable && (
               <button type="button" className="button" onClick={() => share(file, phase.url)} disabled={handing}>

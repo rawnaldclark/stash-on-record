@@ -1,14 +1,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { base64, handToApp, SAVE_CHUNK_BYTES, saveId, type SaveMessage } from '../../src/stash/save'
+import type { FromStash } from '../../src/stash/embed'
+import {
+  abandonSaves,
+  base64,
+  handToApp,
+  SAVE_ACK_TIMEOUT_MS,
+  SAVE_CHUNK_BYTES,
+  SAVE_WINDOW,
+  saveId,
+  SaveFailed,
+  type SaveAbort,
+  type SaveChannel,
+  type SaveMessage,
+} from '../../src/stash/save'
 
 /*
  * A poster or the race video handed to the Stash app (stash:save), chunk by chunk. The app decodes each chunk's base64 and
- * appends the bytes, so the tests check the chunks' edges, the encoding, and that every file's chunks share an id of their own.
+ * appends the bytes, and acks each chunk it has taken (stash:save-ack); the record keeps at most two unacked and gives a file up
+ * (stash:save-abort) when the app goes quiet or the page goes away. So the tests check the chunks' edges, the encoding, the ids,
+ * and the flow: the window, the acks that count and the ones that don't, the timeout and the teardown.
  */
 
 const KIB = 1024
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -43,12 +59,55 @@ function firstDifference(a: Uint8Array, b: Uint8Array): number {
 /** `n` bytes that differ from their neighbours, so a chunk put back in the wrong place shows */
 const bytesOf = (n: number) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + (i >> 8) * 7 + 11) & 255)
 
-/** Hands `n` bytes over and returns the chunks posted */
+/**
+ * The app's side of the bridge. `auto` acks each chunk as it arrives (a tick later, as a real bridge answers); otherwise the
+ * test acks with `ack`. `chunks` and `aborts` are what the record sent it.
+ */
+function fakeApp({ auto = false } = {}) {
+  const sent: (SaveMessage | SaveAbort)[] = []
+  const handlers = new Set<(m: FromStash) => void>()
+  const say = (m: unknown) => {
+    for (const h of [...handlers]) h(m as FromStash)
+  }
+  const channel: SaveChannel = {
+    post(m) {
+      sent.push(m)
+      if (auto && m.type === 'stash:save') queueMicrotask(() => say({ type: 'stash:save-ack', id: m.id, seq: m.seq }))
+    },
+    listen(h) {
+      handlers.add(h)
+      return () => void handlers.delete(h)
+    },
+  }
+  return {
+    channel,
+    chunks: () => sent.filter((m): m is SaveMessage => m.type === 'stash:save'),
+    aborts: () => sent.filter((m) => m.type === 'stash:save-abort'),
+    ack: (id: string, seq: unknown) => say({ type: 'stash:save-ack', id, seq }),
+    say,
+    listening: () => handlers.size,
+  }
+}
+
+/** A hand-over's promise, and whether it has settled yet */
+function track(p: Promise<void>) {
+  const state = { settled: false, error: undefined as unknown }
+  p.then(
+    () => void (state.settled = true),
+    (e) => void ((state.settled = true), (state.error = e)),
+  )
+  return state
+}
+
+/** Lets the reads already started finish (a chunk is read before it goes), then a little more: nothing else should go */
+const quiet = () => new Promise((resolve) => setTimeout(resolve, 30))
+
+/** Hands `n` bytes to an app that acks everything, and returns the chunks posted */
 async function handOver(n: number, opts: { type?: string; name?: string; action?: 'save' | 'share' } = {}) {
-  const sent: SaveMessage[] = []
+  const app = fakeApp({ auto: true })
   const bytes = bytesOf(n)
-  await handToApp(new Blob([bytes], opts.type === undefined ? {} : { type: opts.type }), opts.name ?? 'stash-record.png', opts.action ?? 'save', (m) => void sent.push(m))
-  return { sent, bytes }
+  await handToApp(new Blob([bytes], opts.type === undefined ? {} : { type: opts.type }), opts.name ?? 'stash-record.png', opts.action ?? 'save', { channel: app.channel })
+  return { sent: app.chunks(), bytes, app }
 }
 
 /** Puts the file back together the way the app does: each chunk decoded on its own, the bytes appended */
@@ -62,6 +121,9 @@ const joined = (sent: SaveMessage[]) => {
   }
   return out
 }
+
+/** A file of `chunks` whole chunks */
+const fileOf = (chunks: number) => new Blob([bytesOf(chunks * SAVE_CHUNK_BYTES)], { type: 'video/mp4' })
 
 describe('base64', () => {
   it('is standard, padded base64 (the RFC 4648 vectors)', () => {
@@ -100,13 +162,7 @@ describe('base64', () => {
   })
 })
 
-describe('handing a file to the app', () => {
-  it('sends an empty file as one chunk, the last, with nothing in it', async () => {
-    const { sent } = await handOver(0, { type: 'image/png', name: 'empty.png', action: 'share' })
-    expect(sent).toEqual([{ type: 'stash:save', id: sent[0].id, name: 'empty.png', mime: 'image/png', action: 'share', seq: 0, done: true, data: '' }])
-    expect(sent[0].id).toBeTruthy()
-  })
-
+describe('the chunks', () => {
   it('cuts chunks of at most 512 KiB, each but the last a whole number of 3-byte groups', () => {
     expect(SAVE_CHUNK_BYTES).toBeLessThanOrEqual(512 * KIB)
     expect(SAVE_CHUNK_BYTES % 3).toBe(0)
@@ -166,42 +222,188 @@ describe('handing a file to the app', () => {
     const { sent } = await handOver(3)
     expect(sent[0].id).toMatch(/^[0-9a-z]+-[0-9a-z]+-[0-9a-z]*$/)
   })
+})
 
-  it('resolves once the last chunk is posted, and rejects (sending no more) when posting fails', async () => {
-    const sent: SaveMessage[] = []
-    const done = handToApp(new Blob([bytesOf(2 * SAVE_CHUNK_BYTES + 1)]), 'big.png', 'save', (m) => void sent.push(m))
-    expect(sent.some((m) => m.done)).toBe(false)
-    await done
-    expect(sent.map((m) => m.done)).toEqual([false, false, true])
+describe('the flow', () => {
+  it(`holds at ${SAVE_WINDOW} chunks unacked`, async () => {
+    expect(SAVE_WINDOW).toBe(2)
+    const app = fakeApp()
+    const done = track(handToApp(fileOf(5), 'race.mp4', 'save', { channel: app.channel }))
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(2))
+    await quiet()
+    expect(app.chunks().map((m) => m.seq)).toEqual([0, 1])
+    expect(done.settled).toBe(false)
+  })
 
+  it('sends the next chunk for each ack, never more than two ahead, and is done when the last is acked', async () => {
+    const app = fakeApp()
+    const done = track(handToApp(fileOf(4), 'race.mp4', 'save', { channel: app.channel }))
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(2))
+    const id = app.chunks()[0].id
+    app.ack(id, 0)
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(3))
+    await quiet()
+    expect(app.chunks()).toHaveLength(3)
+    app.ack(id, 1)
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(4))
+    expect(app.chunks().map((m) => [m.seq, m.done])).toEqual([
+      [0, false],
+      [1, false],
+      [2, false],
+      [3, true],
+    ])
+    app.ack(id, 2)
+    await quiet()
+    expect(done.settled).toBe(false)
+    app.ack(id, 3)
+    await vi.waitFor(() => expect(done.settled).toBe(true))
+    expect(done.error).toBeUndefined()
+    expect(app.aborts()).toEqual([])
+    expect(app.listening()).toBe(0)
+  })
+
+  it('ignores an ack for another file, for a chunk not sent, for one acked already, or not an ack at all', async () => {
+    const app = fakeApp()
+    track(handToApp(fileOf(4), 'race.mp4', 'save', { channel: app.channel }))
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(2))
+    const id = app.chunks()[0].id
+    app.ack('another-file', 0)
+    app.ack(id, 2) // not sent yet
+    app.ack(id, '0') // a seq that isn't a number
+    app.say({ type: 'stash:back' })
+    await quiet()
+    expect(app.chunks()).toHaveLength(2)
+    app.ack(id, 0)
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(3))
+    app.ack(id, 0) // again: frees nothing more
+    await quiet()
+    expect(app.chunks()).toHaveLength(3)
+  })
+
+  it('takes acks in any order', async () => {
+    const app = fakeApp()
+    const done = track(handToApp(fileOf(4), 'race.mp4', 'save', { channel: app.channel }))
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(2))
+    const id = app.chunks()[0].id
+    app.ack(id, 1)
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(3))
+    app.ack(id, 0)
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(4))
+    app.ack(id, 3)
+    await quiet()
+    expect(done.settled).toBe(false)
+    app.ack(id, 2)
+    await vi.waitFor(() => expect(done.settled).toBe(true))
+    expect(done.error).toBeUndefined()
+  })
+
+  it('sends an empty file as one chunk, the last, with nothing in it, and is done once it is acked', async () => {
+    const app = fakeApp()
+    const done = track(handToApp(new Blob([], { type: 'image/png' }), 'empty.png', 'share', { channel: app.channel }))
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(1))
+    const [chunk] = app.chunks()
+    expect(chunk).toEqual({ type: 'stash:save', id: chunk.id, name: 'empty.png', mime: 'image/png', action: 'share', seq: 0, done: true, data: '' })
+    await quiet()
+    expect(done.settled).toBe(false)
+    app.ack(chunk.id, 0)
+    await vi.waitFor(() => expect(done.settled).toBe(true))
+    expect(done.error).toBeUndefined()
+  })
+
+  it('gives the file up when no ack comes in time: stops, tells the app, frees the button', async () => {
+    const app = fakeApp()
+    const done = track(handToApp(fileOf(5), 'race.mp4', 'save', { channel: app.channel, timeoutMs: 40 }))
+    await vi.waitFor(() => expect(done.settled).toBe(true))
+    expect(done.error).toBeInstanceOf(SaveFailed)
+    expect((done.error as SaveFailed).reason).toBe('timeout')
+    const id = app.chunks()[0].id
+    expect(app.aborts()).toEqual([{ type: 'stash:save-abort', id }])
+    // Nothing more goes, even for an ack that comes late
+    app.ack(id, 0)
+    await quiet()
+    expect(app.chunks()).toHaveLength(2)
+    expect(app.listening()).toBe(0)
+  })
+
+  it(`waits ${SAVE_ACK_TIMEOUT_MS / 1000} s from the last ack, and gives up after the last chunk too if its ack never comes`, async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const app = fakeApp()
+    const done = track(handToApp(fileOf(3), 'race.mp4', 'save', { channel: app.channel }))
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(2), { interval: 1 })
+    const id = app.chunks()[0].id
+    vi.advanceTimersByTime(SAVE_ACK_TIMEOUT_MS - 100)
+    // An ack counts the wait from the start again
+    app.ack(id, 0)
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(3), { interval: 1 })
+    vi.advanceTimersByTime(SAVE_ACK_TIMEOUT_MS - 100)
+    await Promise.resolve()
+    expect(done.settled).toBe(false)
+    app.ack(id, 1)
+    vi.advanceTimersByTime(SAVE_ACK_TIMEOUT_MS - 100)
+    await Promise.resolve()
+    expect(done.settled).toBe(false)
+    // The last chunk's ack never comes
+    vi.advanceTimersByTime(200)
+    await vi.waitFor(() => expect(done.settled).toBe(true), { interval: 1 })
+    expect((done.error as SaveFailed).reason).toBe('timeout')
+    expect(app.aborts()).toEqual([{ type: 'stash:save-abort', id }])
+  })
+
+  it('gives every file on its way up when the page goes away, telling the app for each', async () => {
+    const app = fakeApp()
+    const a = track(handToApp(fileOf(3), 'a.mp4', 'save', { channel: app.channel }))
+    const b = track(handToApp(fileOf(3), 'b.png', 'share', { channel: app.channel }))
+    await vi.waitFor(() => expect(app.chunks()).toHaveLength(4))
+    abandonSaves()
+    await vi.waitFor(() => expect(a.settled && b.settled).toBe(true))
+    expect([a, b].map((x) => (x.error as SaveFailed).reason)).toEqual(['teardown', 'teardown'])
+    const ids = [...new Set(app.chunks().map((m) => m.id))]
+    expect(app.aborts()).toEqual(ids.map((id) => ({ type: 'stash:save-abort', id })))
+    // Done with: a second teardown tells nothing more
+    abandonSaves()
+    expect(app.aborts()).toHaveLength(2)
+  })
+
+  it('gives up, and says so, when a chunk can’t be posted', async () => {
     let calls = 0
-    const failing = handToApp(new Blob([bytesOf(2 * SAVE_CHUNK_BYTES + 1)]), 'big.png', 'save', () => {
-      calls++
-      if (calls === 2) throw new Error('the bridge is gone')
-    })
-    await expect(failing).rejects.toThrow('the bridge is gone')
-    expect(calls).toBe(2)
+    const sent: unknown[] = []
+    const channel: SaveChannel = {
+      post(m) {
+        if (m.type === 'stash:save' && ++calls === 2) throw new Error('the bridge is gone')
+        sent.push(m)
+      },
+      listen: () => () => {},
+    }
+    await expect(handToApp(fileOf(3), 'big.png', 'save', { channel })).rejects.toMatchObject({ name: 'SaveFailed', reason: 'post' })
+    expect(sent.map((m) => (m as { type: string }).type)).toEqual(['stash:save', 'stash:save-abort'])
   })
 })
 
+/** The record in the app's WebView: its bridge, what it sent (parsed), and a way to be the app */
+async function inApp() {
+  const posted: { type: string; [k: string]: unknown }[] = []
+  const listeners = new Map<string, () => void>()
+  const host = { postMessage: (s: string) => void posted.push(JSON.parse(s)), onmessage: null as ((e: { data: unknown }) => void) | null }
+  vi.stubGlobal('window', {
+    location: { search: '?embed=stash-app', origin: 'https://appassets.androidplatform.net' },
+    addEventListener: (type: string, fn: () => void) => void listeners.set(type, fn),
+    removeEventListener: () => {},
+    StashHost: host,
+    get parent() {
+      return this
+    },
+  })
+  vi.resetModules()
+  const save = await import('../../src/stash/save')
+  return { save, posted, fromApp: (msg: unknown) => host.onmessage?.({ data: JSON.stringify(msg) }), listeners }
+}
+
 describe('inside the app', () => {
-  it('goes over the app’s bridge as JSON strings, as every message to the app does', async () => {
-    const posted: string[] = []
-    const host = { postMessage: (s: string) => void posted.push(s), onmessage: null }
-    vi.stubGlobal('window', {
-      location: { search: '?embed=stash-app', origin: 'https://appassets.androidplatform.net' },
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      StashHost: host,
-      get parent() {
-        return this
-      },
-    })
-    vi.resetModules()
-    const save = await import('../../src/stash/save')
-    await save.handToApp(new Blob([bytesOf(4)], { type: 'image/png' }), 'stash-record-2026-deep.png', 'save')
-    expect(posted).toHaveLength(1)
-    expect(JSON.parse(posted[0])).toEqual({
+  it('goes over the app’s bridge as JSON strings, and hears the app’s acks the same way', async () => {
+    const { save, posted, fromApp } = await inApp()
+    const done = track(save.handToApp(new Blob([bytesOf(4)], { type: 'image/png' }), 'stash-record-2026-deep.png', 'save'))
+    await vi.waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toEqual({
       type: 'stash:save',
       id: expect.any(String),
       name: 'stash-record-2026-deep.png',
@@ -211,19 +413,26 @@ describe('inside the app', () => {
       done: true,
       data: reference(bytesOf(4)),
     })
+    fromApp({ type: 'stash:save-ack', id: posted[0].id, seq: 0 })
+    await vi.waitFor(() => expect(done.settled).toBe(true))
+    expect(done.error).toBeUndefined()
   })
 
-  it('says nothing outside Stash (the bridge is the only way out, and only the app host calls this)', async () => {
+  it('gives up what’s on its way when the page is hidden for good (pagehide), telling the app', async () => {
+    const { save, posted, listeners } = await inApp()
+    const done = track(save.handToApp(new Blob([bytesOf(SAVE_CHUNK_BYTES * 3)]), 'race.mp4', 'save'))
+    await vi.waitFor(() => expect(posted).toHaveLength(2))
+    listeners.get('pagehide')?.()
+    await vi.waitFor(() => expect(done.settled).toBe(true))
+    expect(posted.at(-1)).toEqual({ type: 'stash:save-abort', id: posted[0].id })
+  })
+
+  it('says nothing outside Stash, and doesn’t wait for an ack no one would send', async () => {
     const parent = { postMessage: vi.fn() }
-    vi.stubGlobal('window', {
-      location: { search: '', origin: 'https://example.com' },
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      parent,
-    })
+    vi.stubGlobal('window', { location: { search: '', origin: 'https://example.com' }, addEventListener: () => {}, removeEventListener: () => {}, parent })
     vi.resetModules()
     const save = await import('../../src/stash/save')
-    await save.handToApp(new Blob([bytesOf(4)]), 'x.png', 'save')
+    await expect(save.handToApp(new Blob([bytesOf(4)]), 'x.png', 'save')).rejects.toMatchObject({ reason: 'no-app' })
     expect(parent.postMessage).not.toHaveBeenCalled()
   })
 })

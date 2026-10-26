@@ -39,6 +39,9 @@ const SAVE_LABEL = IOS ? 'Save to Photos' : 'Save or share…'
 /** Every poster carries the same title; inside Stash, its name */
 const TITLE = EMBEDDED ? 'Stash' : 'On Record'
 
+/** Inside the Stash app, when the app didn't take the image (no answer in time): the button is free again */
+const LOST_NOTE = 'Stash didn’t take the image. Try again.'
+
 /** Deep dive can also come out this many times bigger, so a single day's groove gets real pixels */
 const ULTRA_SCALES = [4, 3, 2]
 
@@ -99,6 +102,8 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const [ultra, setUltra] = useState<{ key: string; data: PosterData; blob: Blob } | null>(null)
   // When the last image made for these options came out smaller than its size promises (`made`), or not at all (null)
   const [shortfall, setShortfall] = useState<{ key: string; data: PosterData; made: { width: number; height: number } | null } | null>(null)
+  // Inside the Stash app: the options whose image the app didn't take (stash/save.ts gave it up). Never set on the web
+  const [lostAt, setLostAt] = useState<{ key: string; data: PosterData } | null>(null)
   // The app needs no fresh tap to share, and can save: there Ultra HD is made and saved in one go, as on a computer
   const mobile = COARSE && canShare && !APP_HOST
 
@@ -215,8 +220,9 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const ultraReady = ultra && ultra.key === optionsKey && ultra.data === data ? ultra.blob : null
   const ultraName = fileName.replace(/\.png$/, '-ultra.png')
   const short = shortfall && shortfall.key === optionsKey && shortfall.data === data ? shortfall : null
+  const lost = lostAt && lostAt.key === optionsKey && lostAt.data === data
 
-  /** Resolves once the file is handed over: in the app, after its last chunk is posted, so the button stays busy until then */
+  /** Resolves once the file is handed over: in the app, once it has acked the last chunk, so the button stays busy until then */
   async function save(blob: Blob, name = fileName) {
     if (APP_HOST) return toApp(blob, name, 'save')
     const url = URL.createObjectURL(blob)
@@ -227,12 +233,15 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     setTimeout(() => URL.revokeObjectURL(url), 2000)
   }
 
-  /** Inside the Stash app, which saves the file or opens the share sheet with it */
+  /** Inside the Stash app, which saves the file or opens the share sheet with it; a file it didn't take says so in the notice */
   async function toApp(blob: Blob, name: string, action: SaveAction) {
+    const at = { key: optionsKey, data }
+    setLostAt(null)
     try {
       await handToApp(blob, name, action)
     } catch (err) {
       console.error(err)
+      setLostAt(at)
     }
   }
 
@@ -342,7 +351,13 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     return (
       <div className={sheet ? 'studio studio--card is-sheet' : 'studio studio--card'}>
         {preview}
-        {short && (
+        {/* One notice at a time on the card, the latest: a file the app didn't take */}
+        {lost && (
+          <p className="studio__notice" role="status">
+            {LOST_NOTE}
+          </p>
+        )}
+        {short && !lost && (
           <p className="studio__notice" role="status">
             {short.made ? `This phone could only make it ${short.made.width} × ${short.made.height} px.` : 'This phone couldn’t make the image. Try again.'}
           </p>
@@ -499,7 +514,12 @@ export function PosterStudio({ data, design, onDesign }: Props) {
             )}
           </div>
         )}
-        {short && (
+        {lost && (
+          <p className="studio__notice" role="status">
+            {LOST_NOTE}
+          </p>
+        )}
+        {short && !lost && (
           <p className="studio__notice" role="status">
             {short.made
               ? `This device could only make it ${short.made.width} × ${short.made.height} px, not the full ${spec.width} × ${spec.height}. A computer can make it full size.`

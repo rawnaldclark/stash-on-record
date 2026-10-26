@@ -69,8 +69,14 @@ export type ToStash =
    * share sheet ('share'), since a WebView has neither downloads nor navigator.share. One file comes as chunks on the same
    * `id`: `seq` counts from 0, `done` marks the last, and `data` is a chunk's bytes in base64 (at most 512 KiB of them; every
    * chunk but the last a multiple of 3 bytes, so only the last is padded). Every chunk carries the name, type and action.
+   * The app acks each chunk (stash:save-ack); at most two go unacked, so the app never holds more than two chunks' text.
    */
   | { type: 'stash:save'; id: string; name: string; mime: string; action: SaveAction; seq: number; done: boolean; data: string }
+  /**
+   * The app only: the record gave up on the file `id` before its last chunk was acked (no ack for 15 s, or the page going away).
+   * No more chunks come for it; what the app has of it can go.
+   */
+  | { type: 'stash:save-abort'; id: string }
 
 /** What the app does with a file the record hands it: keeps it on the phone, or opens the share sheet with it. */
 export type SaveAction = 'save' | 'share'
@@ -92,6 +98,8 @@ export type FromStash =
   | { type: 'stash:archive'; rows: ArchivePlay[]; seq: number; done: boolean }
   /** The app only: its back gesture. What's open over the record closes first; with nothing open, the record. */
   | { type: 'stash:back' }
+  /** The app only (save.ts): it has taken chunk `seq` of the file `id`, so the record may send another. */
+  | { type: 'stash:save-ack'; id: string; seq: number }
 
 /**
  * What the app may send; anything else from it is dropped. Not `stash:live`: the app stacks every source itself and sends one
@@ -104,6 +112,7 @@ const FROM_APP: ReadonlySet<string> = new Set([
   'stash:covers',
   'stash:archive',
   'stash:back',
+  'stash:save-ack',
 ] satisfies FromStash['type'][])
 
 /** None when prerendering: there's no window, and no one to talk to. */
