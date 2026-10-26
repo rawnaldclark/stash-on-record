@@ -10,6 +10,7 @@
  *
  * Everything else (ready, counts, play, import, close, covers, theme, sources) is what the player's frame says and hears.
  */
+import { closeTopmost } from '../lib/back'
 import type { LoadResult } from '../types'
 import { fromArchive, onStash, tellStash, type ArchivePlay } from './embed'
 
@@ -125,4 +126,19 @@ export function archiveFromApp(pressed: (result: LoadResult) => void): () => voi
   })
   hello()
   return stop
+}
+
+/**
+ * The app's back gesture: what was opened over the record last (a sheet, the launcher, Settings, a menu) closes, as back does on
+ * the phone's deck; with nothing open, the record closes, back to the app.
+ */
+export function backInApp(): void {
+  if (!closeTopmost()) tellStash({ type: 'stash:close' })
+}
+
+/** Listens for the app's back gesture (`stash:back`); returns how to stop. */
+export function listenForBack(): () => void {
+  return onStash((m) => {
+    if (m.type === 'stash:back') backInApp()
+  })
 }

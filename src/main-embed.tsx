@@ -7,8 +7,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './stash/theme.css'
+import { listenForBack } from './stash/app'
 import EmbedApp from './stash/EmbedApp'
-import { EMBEDDED, tellStash } from './stash/embed'
+import { APP_HOST, EMBEDDED, tellStash } from './stash/embed'
 import { keepNoHistory } from './stash/history'
 
 if (EMBEDDED) {
@@ -20,6 +21,8 @@ if (EMBEDDED) {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('dialog[open], [aria-expanded="true"]')) tellStash({ type: 'stash:close' })
   })
+  // In the app, its back gesture: what's open over the record first, then the record (app.ts)
+  if (APP_HOST) listenForBack()
 }
 
 createRoot(document.getElementById('root')!).render(
