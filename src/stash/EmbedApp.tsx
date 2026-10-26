@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LoadResult, Play } from '../types'
+import { archiveFromApp } from './app'
 import { learnPlays } from './covers'
-import { countSources, loadFromStash, onStash, stack, tellStash, type LivePlay, type Source } from './embed'
+import { APP_HOST, countSources, loadFromStash, onStash, stack, tellStash, type LivePlay, type Source } from './embed'
 
 /*
  * The app inside Stash: no landing page and no drop zone. The plays are already in the player's archive (the Spotify export and
@@ -13,6 +14,9 @@ import { countSources, loadFromStash, onStash, stack, tellStash, type LivePlay, 
  * Pressing is the slow part (every chart worked out again from every play), so it happens only for a real change: the same plays
  * or sources sent again change nothing, and new plays of this browser's (a song just played) go into the record as it stands,
  * without starting it over.
+ *
+ * In the Stash app (app.ts) the archive comes from the app instead, already stacked, in answer to a hello; a reload says hello
+ * again. The app sends no `stash:live`.
  */
 
 /**
@@ -20,6 +24,9 @@ import { countSources, loadFromStash, onStash, stack, tellStash, type LivePlay, 
  * Nothing is read or written, and the sample is made on the spot, so it is harmless in any build.
  */
 const DEMO = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1'
+
+/** In the app, the archive is the app's to send (the sample still wins, as it does over this browser's archive). */
+const ARCHIVE_FROM_APP = APP_HOST && !DEMO
 
 const Dashboard = lazy(() => import('../components/Dashboard').then((m) => ({ default: m.Dashboard })))
 
@@ -41,24 +48,28 @@ export default function EmbedApp() {
   const livePrinted = useRef(livePrint([]))
   const sourcesPrinted = useRef(sourcesPrint(ALL))
 
+  // A new archive: the record starts over on it
+  const pressed = useCallback((result: LoadResult) => {
+    setArchive({ status: 'ready', result })
+    setN((x) => x + 1)
+  }, [])
+
   const load = useCallback(async () => {
     try {
-      const result = DEMO ? (await import('../data/load')).loadSample() : await loadFromStash()
-      setArchive({ status: 'ready', result })
-      setN((x) => x + 1)
+      pressed(DEMO ? (await import('../data/load')).loadSample() : await loadFromStash())
     } catch {
       setArchive({ status: 'error' })
       // the player's cover goes now, not after its wait: this page says what went wrong
       tellStash({ type: 'stash:ready', plays: 0 })
     }
-  }, [])
+  }, [pressed])
 
   useEffect(() => {
-    // The read is the external system here: its answer arrives after the effect, never inside it
-    void Promise.resolve().then(load)
-    return onStash((m) => {
-      if (m.type === 'stash:reload') void load()
-      else if (m.type === 'stash:theme') document.documentElement.dataset.theme = m.theme
+    const stop = onStash((m) => {
+      // The app's reload is archiveFromApp's: it says hello again
+      if (m.type === 'stash:reload') {
+        if (!ARCHIVE_FROM_APP) void load()
+      } else if (m.type === 'stash:theme') document.documentElement.dataset.theme = m.theme
       else if (m.type === 'stash:live' && Array.isArray(m.plays)) {
         // This browser's plays: into the record as it stands (no starting over), and only when they're new
         const plays = m.plays.filter(validLive)
@@ -75,7 +86,18 @@ export default function EmbedApp() {
         setN((x) => x + 1)
       }
     })
-  }, [load])
+    // The app answers a hello, said once its listener is live; the answer, like the read below, arrives after the effect
+    if (ARCHIVE_FROM_APP) {
+      const stopApp = archiveFromApp(pressed)
+      return () => {
+        stop()
+        stopApp()
+      }
+    }
+    // The read is the external system here: its answer arrives after the effect, never inside it
+    void Promise.resolve().then(load)
+    return stop
+  }, [load, pressed])
 
   const result = useMemo<LoadResult | null>(() => {
     if (archive.status !== 'ready') return null
