@@ -125,7 +125,7 @@ describe('the archive from the app', () => {
       { ...row('x', 0), s: 0 },
       { ...row('x', 0), s: null }, // NaN, as JSON writes it
       { ...row('x', 0), ms: -1 },
-      { ...row('x', 0), ms: 6 * 3_600_000 + 1 },
+      { ...row('x', 0), ms: 24 * 3_600_000 + 1 },
       { ...row('x', 0), f: 1.5 },
       { ...row('x', 0), f: -1 },
       { ...row('x', 0), f: '2' },
@@ -236,6 +236,55 @@ describe('the archive from the app', () => {
     expect(pressed.mock.calls[0][0].plays).toHaveLength(41_234)
   })
 
+  it('keeps one row per id, the first, as the web’s archive (keyed by id) holds them; the count of the rest goes to the console', async () => {
+    const { app, fromApp } = await inApp()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const pressed = vi.fn<(r: LoadResult) => void>()
+    app.archiveFromApp(pressed)
+    const kept = row('Kept', STASH, 200_000)
+    // The same id again: in the same chunk with other words and length, and in a later chunk exactly as it was
+    fromApp(chunk([kept, { ...kept, t: 'Other words', ms: 90_000, f: LASTFM }], 0, false))
+    fromApp(chunk([row('Next', STASH), kept], 1, true))
+    const plays = pressed.mock.calls[0][0].plays
+    expect(plays.map((p) => [p.title, p.msPlayed])).toEqual([
+      ['Kept', 200_000],
+      ['Next', 200_000],
+    ])
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0][0]).toContain('2 of the app')
+    expect(warn.mock.calls[0][0]).not.toContain('Kept')
+  })
+
+  it('forgets the ids of an older answer: a new answer keeps its own first rows', async () => {
+    const { app, fromApp } = await inApp()
+    const pressed = vi.fn<(r: LoadResult) => void>()
+    app.archiveFromApp(pressed)
+    const one = row('One', STASH)
+    fromApp(chunk([one], 0, true))
+    fromApp(chunk([one], 0, true))
+    expect(pressed.mock.calls.map(([r]) => r.plays.length)).toEqual([1, 1])
+  })
+
+  it('orders the rows as the web’s archive hands them over (by id), so plays ending together come out the same however the app sent them', async () => {
+    const { embed, app, fromApp } = await inApp()
+    const pressed = vi.fn<(r: LoadResult) => void>()
+    app.archiveFromApp(pressed)
+    // Three plays ending at the same moment, by three artists, and one before them; ids in plain UTF-16 order: 'B' < 'a' < 'b'
+    const together = [
+      { id: 'b|1', t: 'Lower b', a: 'Third', s: T, ms: 200_000, f: STASH },
+      { id: 'B|1', t: 'Upper B', a: 'First', s: T + 100_000, ms: 100_000, f: STASH },
+      { id: 'a|1', t: 'Lower a', a: 'Second', s: T + 50_000, ms: 150_000, f: STASH },
+      { id: 'z|0', t: 'Earlier', a: 'Zero', s: T - 600_000, ms: 200_000, f: STASH },
+    ]
+    fromApp(chunk(together, 0, true))
+    fromApp(chunk([...together].reverse(), 0, true))
+    const [sent, reversed] = pressed.mock.calls.map(([r]) => r.plays.map((p) => p.artist))
+    expect(sent).toEqual(['Zero', 'First', 'Second', 'Third'])
+    expect(reversed).toEqual(sent)
+    // What the web's read presses from the same rows: getAll's order (by id), then fromArchive
+    expect(pressed.mock.calls[0][0]).toEqual(embed.fromArchive([...together].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0))))
+  })
+
   it('stops listening when stopped', async () => {
     const { app, fromApp, hellos } = await inApp()
     const pressed = vi.fn<(r: LoadResult) => void>()
@@ -265,5 +314,32 @@ describe('a row from the app', () => {
     expect(app.archiveRow({ id: 'a', t: 'x'.repeat(300), a: 'A', s: T, ms: 1, f: 0 })).not.toBeNull()
     expect(app.archiveRow({ id: 'a', t: 'T', a: 'A', s: T, ms: 1, f: 0, sid: 'x'.repeat(301) })).toBeNull()
     expect(app.archiveRow({ id: 'a', t: 'T', a: 'A', s: Infinity, ms: 1, f: 0 })).toBeNull()
+  })
+
+  it('keeps a play of up to a day, as the web keeps a Stash play: a 7-hour DJ mix played whole is a real play', async () => {
+    const { app } = await inApp()
+    const at = (ms: number) => app.archiveRow({ id: 'a', t: 'Essential Mix', a: 'DJ', s: T, ms, f: STASH })
+    expect(at(7 * 3_600_000)?.ms).toBe(7 * 3_600_000)
+    expect(at(24 * 3_600_000)?.ms).toBe(24 * 3_600_000)
+    expect(at(24 * 3_600_000 + 1)).toBeNull()
+    expect(at(25 * 3_600_000)).toBeNull()
+  })
+
+  it('keeps a start of any time after 1970, as the web’s read of its archive does (the import keeps odd ones out first)', async () => {
+    const { app } = await inApp()
+    const at = (s: number) => app.archiveRow({ id: 'a', t: 'T', a: 'A', s, ms: 200_000, f: 0 })
+    expect(at(Date.UTC(2005, 5, 15))?.s).toBe(Date.UTC(2005, 5, 15))
+    expect(at(Date.UTC(2099, 0, 1))?.s).toBe(Date.UTC(2099, 0, 1))
+    expect(at(1)?.s).toBe(1)
+    expect(at(0)).toBeNull()
+    expect(at(-1)).toBeNull()
+  })
+
+  it('takes any string as an id, the empty one too (a key the web’s store takes), and nothing else', async () => {
+    const { app } = await inApp()
+    const withId = (id: unknown) => app.archiveRow({ id, t: 'T', a: 'A', s: T, ms: 1, f: 0 })
+    expect(withId('')?.id).toBe('')
+    expect(withId('song|band|1')?.id).toBe('song|band|1')
+    for (const id of [1, null, undefined, ['a'], { id: 'a' }]) expect(withId(id)).toBeNull()
   })
 })

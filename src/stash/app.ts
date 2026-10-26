@@ -14,9 +14,13 @@ import { closeTopmost } from '../lib/back'
 import type { LoadResult } from '../types'
 import { fromArchive, onStash, tellStash, type ArchivePlay } from './embed'
 
-/** The player's own limits on a play it hears (EmbedApp's `validLive`): words up to 300 characters, up to six hours played. */
+/**
+ * The longest row the web's archive can hold, so the app's rows are kept to the same: words up to 300 characters (the player's
+ * import cuts them there), and up to a day played. A play made in Stash keeps its length up to 24 hours (the player's
+ * `phoneRows`: a 7-hour DJ mix played whole is a real play); Spotify's own rows stop at six hours, well inside it.
+ */
 const MAX_TEXT = 300
-const MAX_MS = 6 * 3_600_000
+const MAX_MS = 24 * 3_600_000
 /** Flags are bits read with `&`, which works on 32-bit integers: anything past that isn't a set of flags. */
 const MAX_FLAGS = 0x7fffffff
 
@@ -26,7 +30,10 @@ const maybeWords = (v: unknown): v is string | null | undefined => v === undefin
 
 /**
  * One of the app's rows, checked, as a clean ArchivePlay (only its own fields), or null for a row that can't be a play: words
- * missing or too long, no start, a length past six hours, flags that aren't flags.
+ * missing or too long, no start, a length past a day, flags that aren't flags.
+ *
+ * No other bounds: the web's read of its archive (embed.ts `loadFromStash`) checks nothing, so a start before 2006 or after
+ * today is pressed there as it is here. The player's import keeps such rows out before they are written; the app does the same.
  */
 export function archiveRow(r: unknown): ArchivePlay | null {
   if (!r || typeof r !== 'object') return null
@@ -55,6 +62,9 @@ export interface ArchiveReceiver {
   take(chunk: ArchiveChunk): ArchivePlay[] | null
 }
 
+/** Plain UTF-16 order, as IndexedDB orders string keys (never a locale's collation). */
+const byId = (x: ArchivePlay, y: ArchivePlay) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0)
+
 /**
  * Gathers the app's archive from its chunks. The app answers each hello from seq 0, one chunk after the other, on one ordered
  * channel. So:
@@ -64,43 +74,58 @@ export interface ArchiveReceiver {
  *   still coming in when the record said hello again), and is dropped;
  * - the archive is whole at the chunk marked done.
  *
+ * The whole archive is what the web's would be for the same rows. Its store is keyed by id, so it holds one row per id: here
+ * too, the first row with an id is kept and any later one with the same id (in any chunk) is left out, as the player's import
+ * keeps the play it has over one that comes again. And `getAll` hands the rows over by id, which decides the order of plays
+ * that end at the same moment once they are sorted by end time (and so which artist leads a tie in the charts): the rows are
+ * handed on in that order too, however the app sent them.
+ *
  * Nothing on the wire says which hello a seq-0 chunk answers. When two hellos go out before the first answer starts, the record
  * may be pressed from the first answer and then again from the second; the last answer the app sends is always the one that
  * stays.
  */
 export function archiveReceiver(): ArchiveReceiver {
   let rows: ArchivePlay[] = []
+  let ids = new Set<string>()
   let dropped = 0
+  let repeated = 0
   /** The seq the answer coming in needs next; -1 when none is coming (nothing asked yet, or the last answer is in). */
   let next = -1
+  const reset = () => {
+    rows = []
+    ids = new Set()
+    dropped = 0
+    repeated = 0
+  }
   return {
     hello() {
-      rows = []
-      dropped = 0
+      reset()
       next = 0
     },
     take(chunk) {
       const { seq } = chunk
       if (typeof seq !== 'number' || !Number.isInteger(seq) || seq < 0 || !Array.isArray(chunk.rows)) return null
-      if (seq === 0) {
-        rows = []
-        dropped = 0
-      } else if (seq !== next) return null
+      if (seq === 0) reset()
+      else if (seq !== next) return null
       // One by one rather than spread: a chunk holds thousands of rows, past what a call's arguments can carry
       for (const r of chunk.rows) {
         const row = archiveRow(r)
-        if (row) rows.push(row)
-        else dropped++
+        if (!row) dropped++
+        else if (ids.has(row.id)) repeated++
+        else {
+          ids.add(row.id)
+          rows.push(row)
+        }
       }
       if (chunk.done !== true) {
         next = seq + 1
         return null
       }
-      // Only the count: a row's words are the listener's
+      // Only the counts: a row's words are the listener's
       if (dropped) console.warn(`Your record: ${dropped} of the app's rows weren't plays, left out`)
-      const all = rows
-      rows = []
-      dropped = 0
+      if (repeated) console.warn(`Your record: ${repeated} of the app's rows came again (an id already kept), left out`)
+      const all = rows.sort(byId)
+      reset()
       next = -1
       return all
     },
