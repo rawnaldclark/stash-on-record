@@ -681,7 +681,7 @@ export function Dashboard({ result, isSample, onReset }: Props) {
               )}
             </Chapter>
 
-            <Chapter id="charts" num="C3" title="The Charts" hint="Your rankings." lede="The rankings. Every cover is generated from the name, since nothing is fetched from anywhere.">
+            <Chapter id="charts" num="C3" title="The Charts" hint="Your rankings." lede={EMBEDDED ? 'The rankings, with their covers where Stash finds them.' : 'The rankings. Every cover is generated from the name, since nothing is fetched from anywhere.'}>
               <TopCharts plays={plays} onHide={(artist) => hideArtists([artist])} hidden={hidden} onManage={() => setLauncher('manage')} />
             </Chapter>
 

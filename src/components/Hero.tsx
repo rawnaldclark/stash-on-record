@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import type { HourSlot } from '../data/insights'
 import type { Ranked, Summary } from '../data/stats'
-import { equivalents, formatDuration, formatHour, formatNumber, formatPercent } from '../lib/format'
+import { equivalents, formatCount, formatDuration, formatHour, formatNumber, formatPercent } from '../lib/format'
 import { useCountUp, useSeen } from '../lib/hooks'
 
 interface Props {
@@ -47,11 +47,11 @@ export function Hero({ summary, year, span, isSample, topArtist, hours, newArtis
           {formatNumber(count)}
         </h1>
         <p className="hero__unit">
-          hours <em>on record</em>
+          {Math.round(total) === 1 ? 'hour' : 'hours'} <em>on record</em>
         </p>
         <p className="hero__eq">
-          That’s <b>{formatNumber(eq.days)} days</b> of sound. <b>{formatNumber(eq.flights)} flights</b> from New York to Tokyo.{' '}
-          <b>{formatNumber(eq.marathons)}</b> back-to-back marathons of all eight Harry Potter films.
+          That’s <b>{formatCount(eq.days, 'day', 'days')}</b> of sound. <b>{formatCount(eq.flights, 'flight', 'flights')}</b> from New York to Tokyo.{' '}
+          <b>{formatNumber(eq.marathons)}</b> back-to-back {Math.round(eq.marathons) === 1 ? 'marathon' : 'marathons'} of all eight Harry Potter films.
         </p>
         <div className="hero__actions">
           <button type="button" className="button button--big" onClick={onPlay}>

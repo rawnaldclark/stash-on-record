@@ -8,6 +8,11 @@ export function formatNumber(n: number): string {
   return number.format(Math.round(n))
 }
 
+/** "1 day", "3 days": the noun agrees with the number as shown (rounded) */
+export function formatCount(n: number, one: string, many: string): string {
+  return `${formatNumber(n)} ${Math.round(n) === 1 ? one : many}`
+}
+
 export function formatHours(ms: number): string {
   return `${formatNumber(ms / 3_600_000)} hrs`
 }
