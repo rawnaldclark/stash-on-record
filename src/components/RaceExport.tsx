@@ -1,6 +1,8 @@
 import { useContext, useEffect, useRef, useState, type RefObject } from 'react'
 import type { Bins, RaceData } from '../data/insights'
 import { InCards } from '../lib/stage'
+import { APP_HOST, type SaveAction } from '../stash/embed'
+import { handToApp } from '../stash/save'
 import { makeRaceVideo, raceVideoMode } from '../viz/raceVideo'
 
 /*
@@ -28,6 +30,8 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
   const cards = useContext(InCards)
   const [mode] = useState(raceVideoMode)
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
+  // Inside the Stash app: the video on its way to the app, chunk by chunk (stash/save.ts). Never set on the web
+  const [sending, setSending] = useState<SaveAction | null>(null)
   const abort = useRef<AbortController | null>(null)
   const url = phase.kind === 'done' ? phase.url : null
   // Rendering, or showing what it made: either way the race on the page waits
@@ -74,6 +78,7 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
   }
 
   function save(file: File, href: string) {
+    if (APP_HOST) return void toApp(file, 'save')
     const a = document.createElement('a')
     a.href = href
     a.download = file.name
@@ -81,6 +86,7 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
   }
 
   async function share(file: File, href: string) {
+    if (APP_HOST) return toApp(file, 'share')
     try {
       await navigator.share({ files: [file] })
     } catch (err) {
@@ -90,9 +96,24 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
     }
   }
 
+  /** Inside the Stash app, which saves the video or opens the share sheet with it: the buttons wait until it's all handed over */
+  async function toApp(file: File, action: SaveAction) {
+    setSending(action)
+    try {
+      await handToApp(file, file.name, action)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSending(null)
+    }
+  }
+
   if (phase.kind === 'done') {
     const { file } = phase
-    const shareable = canShareFile(file)
+    // The app can always share it; a WebView alone never could
+    const shareable = APP_HOST || canShareFile(file)
+    const handing = sending !== null
+    const saveLabel = sending === 'save' ? 'Saving…' : 'Save video'
     if (cards) {
       // On a card the finished video takes the race's place until you close it
       return (
@@ -101,19 +122,19 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
           <p className="race-share__title">Your race, ready for your story</p>
           <p className="race-share__note">Made on your phone. Nothing was uploaded.</p>
           {shareable ? (
-            <button type="button" className="button race-share__go" onClick={() => share(file, phase.url)} autoFocus>
+            <button type="button" className="button race-share__go" onClick={() => share(file, phase.url)} disabled={handing} autoFocus>
               <ShareIcon />
-              Share to your story
+              {sending === 'share' ? 'Sharing…' : 'Share to your story'}
             </button>
           ) : (
-            <button type="button" className="button race-share__go" onClick={() => save(file, phase.url)} autoFocus>
-              Save video
+            <button type="button" className="button race-share__go" onClick={() => save(file, phase.url)} disabled={handing} autoFocus>
+              {saveLabel}
             </button>
           )}
           <div className="race-share__more">
             {shareable && (
-              <button type="button" className="race-share__link" onClick={() => save(file, phase.url)}>
-                Save video
+              <button type="button" className="race-share__link" onClick={() => save(file, phase.url)} disabled={handing}>
+                {saveLabel}
               </button>
             )}
             <button type="button" className="race-share__link" onClick={() => setPhase({ kind: 'idle' })}>
@@ -131,12 +152,12 @@ export function RaceExport({ bins, race, colors, board, onBusy }: Props) {
           <p className="field__note">1080 × 1920 · made on your device, nothing uploaded</p>
           <div className="race-export__actions">
             {shareable && (
-              <button type="button" className="button" onClick={() => share(file, phase.url)}>
-                Share…
+              <button type="button" className="button" onClick={() => share(file, phase.url)} disabled={handing}>
+                {sending === 'share' ? 'Sharing…' : 'Share…'}
               </button>
             )}
-            <button type="button" className="button button--ghost" onClick={() => save(file, phase.url)}>
-              Save video
+            <button type="button" className="button button--ghost" onClick={() => save(file, phase.url)} disabled={handing}>
+              {saveLabel}
             </button>
           </div>
           <button type="button" className="race-export__close" onClick={() => setPhase({ kind: 'idle' })}>

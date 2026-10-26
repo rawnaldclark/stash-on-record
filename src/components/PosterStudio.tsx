@@ -4,7 +4,8 @@ import { COARSE } from '../lib/pointer'
 import { InCards, OnStage } from '../lib/stage'
 import { POSTER_DESIGN_SIZES, POSTER_SIZES, SOLID_PAPER_DESIGNS, isDarkPaper, renderPoster, type PosterData, type PosterDesign, type PosterPaper, type PosterSize } from '../viz/poster'
 import { isLost, renderBlob, type RenderedImage } from '../viz/posterShared'
-import { EMBEDDED } from '../stash/embed'
+import { APP_HOST, EMBEDDED, type SaveAction } from '../stash/embed'
+import { handToApp } from '../stash/save'
 import { Segmented } from './ui'
 import { useCloseOnBack } from '../lib/back'
 
@@ -88,7 +89,8 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   // Bumped when the browser hands back a preview canvas it had dropped, so the poster is drawn again
   const [restored, setRestored] = useState(0)
   const [busy, setBusy] = useState<'download' | 'ultra' | 'share' | null>(null)
-  const [canShare] = useState(supportsFileShare)
+  // Inside the Stash app the app saves and shares the file (stash/save.ts): its WebView has no share sheet of its own
+  const [canShare] = useState(() => APP_HOST || supportsFileShare())
   // Safari only opens the share sheet straight after a tap, so on phones the full-size image is made ahead of time
   const readyBlob = useRef<{ key: string; data: PosterData; blob: Blob } | null>(null)
   // On touch screens that full-size image also sits over the preview, so touch and hold saves it like any photo
@@ -97,7 +99,8 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const [ultra, setUltra] = useState<{ key: string; data: PosterData; blob: Blob } | null>(null)
   // When the last image made for these options came out smaller than its size promises (`made`), or not at all (null)
   const [shortfall, setShortfall] = useState<{ key: string; data: PosterData; made: { width: number; height: number } | null } | null>(null)
-  const mobile = COARSE && canShare
+  // The app needs no fresh tap to share, and can save: there Ultra HD is made and saved in one go, as on a computer
+  const mobile = COARSE && canShare && !APP_HOST
 
   // Some designs are drawn for one size only, so the size picker narrows to what they support
   const sizes = POSTER_DESIGN_SIZES[design] ?? (Object.keys(POSTER_SIZES) as PosterSize[])
@@ -213,7 +216,9 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   const ultraName = fileName.replace(/\.png$/, '-ultra.png')
   const short = shortfall && shortfall.key === optionsKey && shortfall.data === data ? shortfall : null
 
-  function save(blob: Blob, name = fileName) {
+  /** Resolves once the file is handed over: in the app, after its last chunk is posted, so the button stays busy until then */
+  async function save(blob: Blob, name = fileName) {
+    if (APP_HOST) return toApp(blob, name, 'save')
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -222,11 +227,20 @@ export function PosterStudio({ data, design, onDesign }: Props) {
     setTimeout(() => URL.revokeObjectURL(url), 2000)
   }
 
+  /** Inside the Stash app, which saves the file or opens the share sheet with it */
+  async function toApp(blob: Blob, name: string, action: SaveAction) {
+    try {
+      await handToApp(blob, name, action)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   async function download() {
     setBusy('download')
     try {
       const blob = await fullSize()
-      if (blob) save(blob)
+      if (blob) await save(blob)
     } finally {
       setBusy(null)
     }
@@ -240,7 +254,7 @@ export function PosterStudio({ data, design, onDesign }: Props) {
       const blob = await fullSize(ULTRA_SCALES)
       if (!blob) return
       if (mobile) setUltra({ key: optionsKey, data, blob })
-      else save(blob, ultraName)
+      else await save(blob, ultraName)
     } finally {
       setBusy(null)
     }
@@ -249,6 +263,17 @@ export function PosterStudio({ data, design, onDesign }: Props) {
   async function share() {
     const cached = readyBlob.current
     let blob = cached && cached.key === optionsKey && cached.data === data ? cached.blob : null
+    // In the app: busy from the tap until the last chunk is posted, whether or not the image was made ahead
+    if (APP_HOST) {
+      setBusy('share')
+      try {
+        blob ??= await fullSize()
+        if (blob) await toApp(blob, fileName, 'share')
+      } finally {
+        setBusy(null)
+      }
+      return
+    }
     if (!blob) {
       setBusy('share')
       blob = await fullSize()
@@ -498,7 +523,8 @@ export function PosterStudio({ data, design, onDesign }: Props) {
           </div>
         )}
         <p className="hint">
-          {COARSE && 'You can also touch and hold the poster to save it. '}Made right here on your device. Nothing is uploaded.
+          {/* The app's WebView offers nothing on a held image */}
+          {COARSE && !APP_HOST && 'You can also touch and hold the poster to save it. '}Made right here on your device. Nothing is uploaded.
         </p>
       </div>
     </div>

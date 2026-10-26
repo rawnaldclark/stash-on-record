@@ -59,6 +59,16 @@ export type ToStash =
    * archive. Sent on load and again on stash:reload. `v` is the protocol's version.
    */
   | { type: 'stash:hello'; v: 1 }
+  /**
+   * The app only (save.ts): a poster or the race video for the app to save ('save', the download buttons) or hand to the
+   * share sheet ('share'), since a WebView has neither downloads nor navigator.share. One file comes as chunks on the same
+   * `id`: `seq` counts from 0, `done` marks the last, and `data` is a chunk's bytes in base64 (at most 512 KiB of them; every
+   * chunk but the last a multiple of 3 bytes, so only the last is padded). Every chunk carries the name, type and action.
+   */
+  | { type: 'stash:save'; id: string; name: string; mime: string; action: SaveAction; seq: number; done: boolean; data: string }
+
+/** What the app does with a file the record hands it: keeps it on the phone, or opens the share sheet with it. */
+export type SaveAction = 'save' | 'share'
 
 /** What the player says to the frame. */
 export type FromStash =
