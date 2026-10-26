@@ -52,6 +52,11 @@ export type ToStash =
   | { type: 'stash:counts'; counts: Record<Source, number> }
   /** Close the record held full screen on a phone (StashClose), back to the player's page. */
   | { type: 'stash:close' }
+  /**
+   * The app only (app.ts): the answer to a stash:back that closed something open over the record (a sheet, the launcher, a
+   * menu). Every stash:back gets one answer, this or stash:close, so the app can tell a page that handled it from one that's stuck.
+   */
+  | { type: 'stash:backed' }
   /** Real covers for the names On Record would draw (covers.ts): an artist, or a song's or album's words. */
   | { type: 'stash:art'; asks: { id: string; artist: string; title?: string; album?: string }[] }
   /**

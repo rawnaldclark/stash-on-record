@@ -6,7 +6,8 @@
  *   chunks (`stash:archive`), every source already stacked with a listen counted once. The record is pressed from those rows as
  *   it is from the player's: the same `toPlay`, flags, sources and counts (embed.ts `fromArchive`). A reload (`stash:reload`)
  *   says hello again.
- * - The app's back gesture comes as `stash:back`: what's open over the record closes first, then the record itself.
+ * - The app's back gesture comes as `stash:back`: what's open over the record closes first (answered `stash:backed`), then the
+ *   record itself (`stash:close`).
  *
  * Everything else (ready, counts, play, import, close, covers, theme, sources) is what the player's frame says and hears.
  */
@@ -155,10 +156,12 @@ export function archiveFromApp(pressed: (result: LoadResult) => void): () => voi
 
 /**
  * The app's back gesture: what was opened over the record last (a sheet, the launcher, Settings, a menu) closes, as back does on
- * the phone's deck; with nothing open, the record closes, back to the app.
+ * the phone's deck, and the app hears `stash:backed`; with nothing open, the record closes, back to the app (`stash:close`).
+ * Every back gets one answer, so the app need only force the record closed when neither comes (a page that's stuck), never on
+ * two quick presses that close two sheets.
  */
 export function backInApp(): void {
-  if (!closeTopmost()) tellStash({ type: 'stash:close' })
+  tellStash(closeTopmost() ? { type: 'stash:backed' } : { type: 'stash:close' })
 }
 
 /** Listens for the app's back gesture (`stash:back`); returns how to stop. */

@@ -31,12 +31,20 @@ afterEach(() => {
 })
 
 describe('back in the app', () => {
-  it('closes what was opened over the record last, and the record stays', async () => {
+  it('closes what was opened over the record last, the record stays, and the app hears stash:backed', async () => {
     const { sent, fromApp } = await inApp()
     back.closeTopmost.mockReturnValueOnce(true)
     fromApp({ type: 'stash:back' })
     expect(back.closeTopmost).toHaveBeenCalledOnce()
-    expect(sent).toEqual([])
+    expect(sent).toEqual([{ type: 'stash:backed' }])
+  })
+
+  it('answers every back once: two quick presses over two sheets are two stash:backed, never a close', async () => {
+    const { sent, fromApp } = await inApp()
+    back.closeTopmost.mockReturnValueOnce(true).mockReturnValueOnce(true)
+    fromApp({ type: 'stash:back' })
+    fromApp({ type: 'stash:back' })
+    expect(sent).toEqual([{ type: 'stash:backed' }, { type: 'stash:backed' }])
   })
 
   it('closes the record when nothing is open over it', async () => {
@@ -52,7 +60,7 @@ describe('back in the app', () => {
     fromApp({ type: 'stash:back' })
     fromApp({ type: 'stash:back' })
     expect(back.closeTopmost).toHaveBeenCalledTimes(2)
-    expect(sent).toEqual([{ type: 'stash:close' }])
+    expect(sent).toEqual([{ type: 'stash:backed' }, { type: 'stash:close' }])
   })
 
   it('hears only stash:back, and nothing once stopped', async () => {
