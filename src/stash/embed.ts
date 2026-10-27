@@ -65,6 +65,11 @@ export type ToStash =
    */
   | { type: 'stash:hello'; v: 1 }
   /**
+   * The app only (app.ts): the record has dealt with stash:archive chunk `seq` (the last one too), so the app may send another;
+   * it keeps at most two unacked. Every chunk with a seq is acked, one left over from an older hello's answer as well.
+   */
+  | { type: 'stash:archive-ack'; seq: number }
+  /**
    * The app only (save.ts): a poster or the race video for the app to save ('save', the download buttons) or hand to the
    * share sheet ('share'), since a WebView has neither downloads nor navigator.share. One file comes as chunks on the same
    * `id`: `seq` counts from 0, `done` marks the last, and `data` is a chunk's bytes in base64 (at most 512 KiB of them; every

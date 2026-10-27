@@ -285,6 +285,88 @@ describe('the archive from the app', () => {
     expect(pressed.mock.calls[0][0]).toEqual(embed.fromArchive([...together].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0))))
   })
 
+  /** The seqs of the archive acks the record sent the app, in order */
+  const acks = (sent: { type: string; [k: string]: unknown }[]) => sent.filter((m) => m.type === 'stash:archive-ack').map((m) => m.seq)
+
+  it('acks each chunk once it has it, in order, the last one too, before pressing', async () => {
+    const { app, sent, fromApp } = await inApp()
+    const ackedAtPress: unknown[][] = []
+    const pressed = vi.fn<(r: LoadResult) => void>(() => void ackedAtPress.push(acks(sent)))
+    app.archiveFromApp(pressed)
+    fromApp(chunk([row('One', STASH)], 0, false))
+    expect(sent.at(-1)).toEqual({ type: 'stash:archive-ack', seq: 0 })
+    fromApp(chunk([row('Two', STASH)], 1, false))
+    expect(sent.at(-1)).toEqual({ type: 'stash:archive-ack', seq: 1 })
+    expect(pressed).not.toHaveBeenCalled()
+    fromApp(chunk([row('Three', STASH)], 2, true))
+    expect(sent.map((m) => m.type)).toEqual(['stash:hello', 'stash:archive-ack', 'stash:archive-ack', 'stash:archive-ack'])
+    expect(acks(sent)).toEqual([0, 1, 2])
+    // The last ack went before the record was pressed (the slow part)
+    expect(ackedAtPress).toEqual([[0, 1, 2]])
+  })
+
+  it('acks an empty archive’s one chunk', async () => {
+    const { app, sent, fromApp } = await inApp()
+    app.archiveFromApp(() => {})
+    fromApp(chunk([], 0, true))
+    expect(acks(sent)).toEqual([0])
+  })
+
+  it('acks from seq 0 again when the app starts a new answer, and presses that one', async () => {
+    const { app, sent, fromApp } = await inApp()
+    const pressed = vi.fn<(r: LoadResult) => void>()
+    app.archiveFromApp(pressed)
+    fromApp(chunk([row('A1', STASH)], 0, false))
+    fromApp(chunk([row('A2', STASH)], 1, false))
+    fromApp(chunk([row('B1', STASH)], 0, false))
+    fromApp(chunk([row('B2', STASH)], 1, true))
+    expect(acks(sent)).toEqual([0, 1, 0, 1])
+    expect(pressed).toHaveBeenCalledOnce()
+    expect(pressed.mock.calls[0][0].plays.map((p) => p.title)).toEqual(['B1', 'B2'])
+  })
+
+  it('acks what’s left of an older answer after a new hello too (done with, dropped), and presses the new answer alone', async () => {
+    const { app, sent, fromApp, hellos } = await inApp()
+    const pressed = vi.fn<(r: LoadResult) => void>()
+    app.archiveFromApp(pressed)
+    fromApp(chunk([row('Old 1', STASH)], 0, false))
+    fromApp({ type: 'stash:reload' })
+    expect(hellos()).toHaveLength(2)
+    // Still on its way from the older answer: the app shouldn't wait on it, and it isn't kept
+    fromApp(chunk([row('Old 2', STASH)], 1, false))
+    fromApp(chunk([row('New 1', STASH)], 0, true))
+    expect(acks(sent)).toEqual([0, 1, 0])
+    expect(pressed.mock.calls.map(([r]) => r.plays.map((p) => p.title))).toEqual([['New 1']])
+  })
+
+  it('acks only a chunk with a seq it can name', async () => {
+    const { app, sent, fromApp } = await inApp()
+    app.archiveFromApp(() => {})
+    for (const seq of ['1', 1.5, -1, null, undefined]) fromApp({ type: 'stash:archive', rows: [], seq, done: false })
+    expect(acks(sent)).toEqual([])
+  })
+
+  it('never acks outside the app: in the player’s frame a chunk from the parent gets no ack', async () => {
+    const listeners = new Set<(e: MessageEvent) => void>()
+    const parent = { postMessage: vi.fn() }
+    const self: Record<string, unknown> = {
+      location: { search: '?embed=stash', origin: ORIGIN },
+      addEventListener: (_: string, fn: (e: MessageEvent) => void) => void listeners.add(fn),
+      removeEventListener: (_: string, fn: (e: MessageEvent) => void) => void listeners.delete(fn),
+      postMessage: vi.fn(),
+      parent,
+    }
+    const { embed, app } = await load(self)
+    expect(embed.APP_HOST).toBe(false)
+    expect(embed.EMBEDDED).toBe(true)
+    const pressed = vi.fn<(r: LoadResult) => void>()
+    app.archiveFromApp(pressed)
+    for (const l of [...listeners]) l({ source: parent, origin: ORIGIN, data: chunk([row('One', STASH)], 0, true) } as unknown as MessageEvent)
+    // The chunk did arrive (so an ack would have gone, were acks the frame's)
+    expect(pressed).toHaveBeenCalledOnce()
+    expect(parent.postMessage.mock.calls.map(([m]) => (m as { type: string }).type)).not.toContain('stash:archive-ack')
+  })
+
   it('stops listening when stopped', async () => {
     const { app, fromApp, hellos } = await inApp()
     const pressed = vi.fn<(r: LoadResult) => void>()

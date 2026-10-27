@@ -13,7 +13,7 @@
  */
 import { closeTopmost } from '../lib/back'
 import type { LoadResult } from '../types'
-import { fromArchive, onStash, tellStash, type ArchivePlay } from './embed'
+import { APP_HOST, fromArchive, onStash, tellStash, type ArchivePlay } from './embed'
 
 /**
  * The longest row the web's archive can hold, so the app's rows are kept to the same: words up to 300 characters (the player's
@@ -133,9 +133,18 @@ export function archiveReceiver(): ArchiveReceiver {
   }
 }
 
+/** A chunk's seq as the app numbers them: a whole number from 0. */
+const isSeq = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0
+
 /**
  * The record's archive from the app: says hello now (the listener is live, so the answer has somewhere to go) and on each
  * stash:reload, and hands `pressed` the record's plays each time an answer is whole. Returns how to stop listening.
+ *
+ * Each chunk is acked (`stash:archive-ack {seq}`) once the receiver has dealt with it, the last one too, and the app keeps at most
+ * two unacked: an import's 400k rows never sit in the WebView as tens of MB of queued strings. Every chunk with a seq is acked,
+ * kept or dropped: one left over from the answer to an older hello is done with as well, so the app never waits on a chunk the
+ * record has seen. An ack names only its seq, so one for an older answer can reach the app after a new hello: the app counts only
+ * acks for chunks it has sent and not yet seen acked, so it changes nothing there.
  */
 export function archiveFromApp(pressed: (result: LoadResult) => void): () => void {
   const receiver = archiveReceiver()
@@ -147,6 +156,8 @@ export function archiveFromApp(pressed: (result: LoadResult) => void): () => voi
     if (m.type === 'stash:reload') hello()
     else if (m.type === 'stash:archive') {
       const rows = receiver.take(m)
+      // Acked before pressing (the slow part): the app needn't wait on it. Only the app acks: the player's frame sends no chunks
+      if (APP_HOST && isSeq(m.seq)) tellStash({ type: 'stash:archive-ack', seq: m.seq })
       if (rows) pressed(fromArchive(rows))
     }
   })
